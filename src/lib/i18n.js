@@ -33,11 +33,6 @@ const resources = {
       "to": "to",
       "showTerminalOutput": "Show terminal output",
       "showProgressBar": "Show progress bar", 
-      "useAdvancedSettings": "Use advanced settings",
-      "useCustomCommand": "Use custom Ghostscript command",
-      "customCommand": "Custom Command:",
-      "customCommandPlaceholder": "e.g., -sDEVICE=pdfwrite -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH -sOutputFile=output.pdf input.pdf",
-      "customCommandHelp": "Enter full Ghostscript command arguments. Required: -sDEVICE= and -sOutputFile=",
       
       // PDF Settings
       "screenOptimized": "Screen-optimized (smallest)",
@@ -86,8 +81,6 @@ const resources = {
       "compressFeature": "Reduce file size with quality presets or custom settings",
       "mergeFeature": "Combine multiple PDFs into one document", 
       "splitFeature": "Extract specific page ranges from a PDF",
-      "customCommandsFeature": "Use advanced Ghostscript commands for power users",
-      "terminalOutputFeature": "View real-time Ghostscript console output during processing",
       "progressBarFeature": "Visual progress tracking with page-by-page processing status",
       
       // Privacy section
@@ -137,10 +130,6 @@ const resources = {
       "showTerminalOutput": "显示终端输出",
       "showProgressBar": "显示进度条",
       "useAdvancedSettings": "使用高级设置",
-      "useCustomCommand": "使用自定义 Ghostscript 命令",
-      "customCommand": "自定义命令：",
-      "customCommandPlaceholder": "例如：-sDEVICE=pdfwrite -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH -sOutputFile=output.pdf input.pdf",
-      "customCommandHelp": "输入完整的 Ghostscript 命令参数。必需：-sDEVICE= 和 -sOutputFile=",
       
       // PDF Settings
       "screenOptimized": "屏幕优化（最小）",
@@ -189,8 +178,6 @@ const resources = {
       "compressFeature": "使用质量预设或自定义设置减小文件大小",
       "mergeFeature": "将多个 PDF 合并为一个文档",
       "splitFeature": "从 PDF 中提取特定页面范围", 
-      "customCommandsFeature": "为高级用户提供高级 Ghostscript 命令",
-      "terminalOutputFeature": "在处理过程中查看实时 Ghostscript 控制台输出",
       "progressBarFeature": "带有逐页处理状态的可视化进度跟踪",
       
       // Privacy section

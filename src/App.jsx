@@ -241,19 +241,6 @@ function App() {
       }
     }
 
-    if (useCustomCommand && !customCommand.trim()) {
-      alert(t('enterCustomCommand'));
-      return false;
-    }
-
-    if (useCustomCommand) {
-      const cmd = customCommand.trim();
-      if (!cmd.includes('-sDEVICE=') || !cmd.includes('-sOutputFile=')) {
-        alert(t('customCommandRequired'));
-        return false;
-      }
-    }
-
     const primaryFilename = files[0]?.filename || 'output.pdf';
     processPDF(activeTab, files, primaryFilename);
     return false;
@@ -568,19 +555,6 @@ function App() {
 
           </div>
         )}
-
-        <div className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            id="useCustomCommand"
-            checked={useCustomCommand}
-            onChange={(e) => setUseCustomCommand(e.target.checked)}
-            className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 focus:ring-2"
-          />
-          <label htmlFor="useCustomCommand" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
-            {t('useCustomCommand')}
-          </label>
-        </div>
 
       </div>
     );
