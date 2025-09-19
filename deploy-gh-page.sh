@@ -19,7 +19,7 @@ echo "Initializing a new Git repository..."
 git init
 
 # Add the remote origin (replace with your actual remote URL)
-REMOTE_URL=git@github.com-krmanik:krmanik/local-pdf-tools.git
+REMOTE_URL=git@github.com-firewox:firewox/web-local-pdf-tools.git
 # git remote add origin "$REMOTE_URL"
 
 # Add all build files to git

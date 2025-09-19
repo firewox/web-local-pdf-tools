@@ -6,8 +6,7 @@ const resources = {
     translation: {
       // Header
       "title": "Local PDF Tools",
-      "subtitle": "Compress, merge, and split PDF files locally in your browser using {{link}}. No uploads required - everything stays on your device.",
-      "ghostscriptLink": "Ghostscript WebAssembly",
+      "subtitle": "Compress, merge, and split PDF files locally in your browser. No uploads required - everything stays on your device.",
       
       // Tabs
       "compress": "Compress",
@@ -110,8 +109,7 @@ const resources = {
     translation: {
       // Header
       "title": "本地 PDF 工具",
-      "subtitle": "使用 {{link}} 在浏览器中本地压缩、合并和拆分 PDF 文件。无需上传 - 一切都保留在您的设备上。",
-      "ghostscriptLink": "Ghostscript WebAssembly",
+      "subtitle": "在浏览器中本地压缩、合并和拆分 PDF 文件。无需上传 - 一切都保留在您的设备上。",
       
       // Tabs
       "compress": "压缩",

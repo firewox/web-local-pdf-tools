@@ -594,7 +594,7 @@ function App() {
           {/* Left: Page Title */}
           <div className="flex items-center h-full">
             <img
-              src="/local-pdf-tools/pdf-file.svg"
+              src="/web-local-pdf-tools/pdf-file.svg"
               alt="PDF Icon"
               className="w-8 h-8 md:w-10 md:h-10 mr-3"
               style={{ display: 'inline-block', verticalAlign: 'middle' }}
@@ -616,9 +616,7 @@ function App() {
           <p 
             className="text-lg text-muted-600 dark:text-muted-300 max-w-2xl mx-auto"
             dangerouslySetInnerHTML={{
-              __html: t('subtitle', {
-                link: `<a target="_blank" href="https://ghostscript.com/" class="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium underline decoration-2 underline-offset-2">${t('ghostscriptLink')}</a>`
-              })
+              __html: t('subtitle')
             }}
           />
         </div>
@@ -856,7 +854,7 @@ function App() {
             </p>
 
             <a
-              href="https://github.com/krmanik/local-pdf-tools"
+              href="https://github.com/firewox/web-local-pdf-tools"
               target="_blank"
               className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium underline decoration-2 underline-offset-2"
             >

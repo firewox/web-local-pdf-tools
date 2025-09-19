@@ -63,7 +63,7 @@ export default function RightButtonBar() {
 
       {/* GitHub Button */}
       <a
-        href="https://github.com/krmanik/local-pdf-tools"
+        href="https://github.com/firewox/web-local-pdf-tools"
         target="_blank"
         rel="noopener noreferrer"
         className="p-3 bg-white dark:bg-gray-800 border border-muted-200 dark:border-gray-700 rounded-xl shadow-soft hover:shadow-medium transition-all duration-200 z-50 flex items-center"
