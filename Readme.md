@@ -3,9 +3,9 @@
 English | [中文](README_CN.md)
 
 This is a PDF processing tool that runs entirely in your browser. It provides three main features:
-- **Split PDF**: Extract specific page ranges from a PDF document
-- **Merge PDF**: Combine multiple PDF files into a single document
-- **Compress PDF**: Reduce PDF file size while maintaining quality
+- **Split PDF**: Extract specific page ranges from a PDF document.
+- **Merge PDF**: Combine multiple PDF files into a single document.
+- **Compress PDF**: Reduce PDF file size while maintaining quality.
 
 ## Context
 
