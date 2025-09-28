@@ -1,4 +1,5 @@
 {
     "Codegeex.CommitMessage.LanguagePreference": "English",
-    "Codegeex.CommitMessageStyle": "Auto"
+    "Codegeex.CommitMessageStyle": "Auto",
+    "markdown.validate.enabled": true
 }

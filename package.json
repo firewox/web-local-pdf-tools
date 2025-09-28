@@ -1,5 +1,5 @@
 {
-  "name": "pdf-compress.wasm",
+  "name": "web-local-pdf-tools.wasm",
   "private": true,
   "version": "0.0.0",
   "type": "module",
