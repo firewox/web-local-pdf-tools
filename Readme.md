@@ -60,7 +60,7 @@ npm run preview
 - [x] Advanced PDF settings (compatibility level, image downsampling)
 
 ### Parse PDF
-- [ ] Extract text content from PDF documents
+- [x] Extract text content from PDF documents
 
 ### Advanced Parse PDF
 - [ ] Use OCR to extract images, metadata, and other structured information

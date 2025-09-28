@@ -12,11 +12,13 @@ const resources = {
       "compress": "Compress",
       "merge": "Merge", 
       "split": "Split",
+      "parse": "Parse",
       
       // Tab descriptions
       "compressDesc": "Reduce PDF file size while maintaining quality.",
       "mergeDesc": "Combine multiple PDF files into a single document.",
       "splitDesc": "Extract specific page ranges from a PDF document.",
+      "parseDesc": "Extract text from PDF pages for copy or export.",
       
       // File input
       "chooseFiles": "Choose PDF file{{count}} to {{operation}}",
@@ -32,7 +34,8 @@ const resources = {
       "endPage": "End page",
       "to": "to",
       "showTerminalOutput": "Show terminal output",
-      "showProgressBar": "Show progress bar", 
+      "showProgressBar": "Show progress bar",
+      "useAdvancedSettings": "Use advanced settings",
       
       // PDF Settings
       "screenOptimized": "Screen-optimized (smallest)",
@@ -52,10 +55,20 @@ const resources = {
       "compressPdf": "Compress PDF",
       "mergePdfs": "Merge PDFs", 
       "splitPdf": "Split PDF",
+      "parsePdf": "Parse PDF",
       "processAgain": "Process Again",
       "chooseNewFiles": "Choose New Files",
       "tryAgain": "Try Again",
       "download": "Download {{filename}}",
+      "parsedResults": "Parsed Results",
+      "pdfPreview": "PDF Preview",
+      "extractedText": "Extracted Text",
+      "page": "Page",
+      "prev": "Previous",
+      "next": "Next",
+      "copyPage": "Copy Page Text",
+      "copyAll": "Copy All Text",
+      "exportTxt": "Export to TXT",
       
       // Processing states
       "processing": "Processing your PDF{{count}}...",
@@ -81,6 +94,7 @@ const resources = {
       "compressFeature": "Reduce file size with quality presets or custom settings",
       "mergeFeature": "Combine multiple PDFs into one document", 
       "splitFeature": "Extract specific page ranges from a PDF",
+      "parseFeature": "Extract text content from PDFs, with copy and export options",
       "progressBarFeature": "Visual progress tracking with page-by-page processing status",
       
       // Privacy section
@@ -108,11 +122,13 @@ const resources = {
       "compress": "压缩",
       "merge": "合并",
       "split": "拆分",
+      "parse": "解析",
       
       // Tab descriptions  
       "compressDesc": "在保持质量的同时减小 PDF 文件大小。",
       "mergeDesc": "将多个 PDF 文件合并为单个文档。",
       "splitDesc": "从 PDF 文档中提取特定页面范围。",
+      "parseDesc": "提取 PDF 各页的文本，支持复制与导出。",
       
       // File input
       "chooseFiles": "选择要{{operation}}的 PDF 文件{{count}}",
@@ -148,11 +164,21 @@ const resources = {
       // Buttons
       "compressPdf": "压缩 PDF",
       "mergePdfs": "合并 PDFs",
-      "splitPdf": "拆分 PDF", 
+      "splitPdf": "拆分 PDF",
+      "parsePdf": "解析 PDF",
       "processAgain": "重新处理",
       "chooseNewFiles": "选择新文件",
       "tryAgain": "重试",
       "download": "下载 {{filename}}",
+      "parsedResults": "解析结果",
+      "pdfPreview": "PDF 预览",
+      "extractedText": "抽取文本",
+      "page": "第",
+      "prev": "上一页",
+      "next": "下一页",
+      "copyPage": "复制当前页文本",
+      "copyAll": "复制全部文本",
+      "exportTxt": "导出为 TXT",
       
       // Processing states
       "processing": "正在处理您的 PDF{{count}}...",
@@ -177,7 +203,8 @@ const resources = {
       "features": "功能",
       "compressFeature": "使用质量预设或自定义设置减小文件大小",
       "mergeFeature": "将多个 PDF 合并为一个文档",
-      "splitFeature": "从 PDF 中提取特定页面范围", 
+      "splitFeature": "从 PDF 中提取特定页面范围",
+      "parseFeature": "提取 PDF 文本内容，支持复制与导出",
       "progressBarFeature": "带有逐页处理状态的可视化进度跟踪",
       
       // Privacy section

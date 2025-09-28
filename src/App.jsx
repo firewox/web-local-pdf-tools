@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import * as pdfjsLib from 'pdfjs-dist';
 import { useTranslation } from 'react-i18next';
 import { _GSPS2PDF } from "./lib/worker-init.js";
 import RightButtonBar from './components/RightButtonBar.jsx';
@@ -36,6 +37,16 @@ function App() {
   const [terminalData, setTerminalData] = useState("");
   const [progressInfo, setProgressInfo] = useState({ current: 0, total: 0, currentPage: 0 });
   const terminalRef = useRef(null);
+  const [parsedPages, setParsedPages] = useState([]);
+  const [currentParsedPage, setCurrentParsedPage] = useState(1);
+  // Parse preview & highlight state
+  const pdfDocRef = useRef(null);
+  const canvasRef = useRef(null);
+  const textLayerRef = useRef(null);
+  const previewContainerRef = useRef(null);
+  const rightTextRef = useRef(null);
+  const [parsedPageItems, setParsedPageItems] = useState([]);
+  const [highlightMap, setHighlightMap] = useState({});
 
   // PDF Settings presets
   const PDF_SETTINGS = {
@@ -154,6 +165,204 @@ function App() {
     }
   }
 
+  // Parse PDF text content per page using pdfjs-dist
+  
+
+  // Render pdf to canvas and build text layer for selection
+  async function renderPdfPage(pageNum) {
+    try {
+      const pdf = pdfDocRef.current;
+      if (!pdf || !canvasRef.current || !previewContainerRef.current) return;
+      const page = await pdf.getPage(pageNum);
+      const viewportBase = page.getViewport({ scale: 1 });
+      const containerWidth = previewContainerRef.current.clientWidth || viewportBase.width;
+      const scale = containerWidth / viewportBase.width;
+      const viewport = page.getViewport({ scale });
+
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      canvas.style.width = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
+      canvas.width = Math.floor(viewport.width * dpr);
+      canvas.height = Math.floor(viewport.height * dpr);
+      const renderContext = {
+        canvasContext: ctx,
+        viewport,
+        transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null
+      };
+      await page.render(renderContext).promise;
+
+      const textLayerEl = textLayerRef.current;
+      if (!textLayerEl) return;
+      textLayerEl.innerHTML = '';
+      textLayerEl.style.position = 'absolute';
+      textLayerEl.style.left = '0';
+      textLayerEl.style.top = '0';
+      textLayerEl.style.width = `${viewport.width}px`;
+      textLayerEl.style.height = `${viewport.height}px`;
+      textLayerEl.style.pointerEvents = 'auto';
+
+      const items = parsedPageItems[pageNum - 1] || [];
+      items.forEach((item, idx) => {
+        let tx = item.transform;
+        try { tx = pdfjsLib.Util.transform(viewport.transform, item.transform); } catch {}
+        const x = tx[4];
+        const y = tx[5];
+        const fontSize = Math.sqrt(tx[2] * tx[2] + tx[3] * tx[3]);
+        const span = document.createElement('span');
+        span.textContent = item.str;
+        span.setAttribute('data-index', String(idx));
+        span.style.position = 'absolute';
+        span.style.left = `${x}px`;
+        span.style.top = `${y - fontSize}px`;
+        span.style.fontSize = `${fontSize}px`;
+        span.style.whiteSpace = 'pre';
+        span.style.lineHeight = '1';
+        span.style.color = 'transparent';
+        textLayerEl.appendChild(span);
+      });
+
+      updateLeftHighlights();
+    } catch {}
+  }
+
+  function updateLeftHighlights() {
+    const set = highlightMap[currentParsedPage] || new Set();
+    const textLayerEl = textLayerRef.current;
+    if (!textLayerEl) return;
+    const spans = textLayerEl.querySelectorAll('[data-index]');
+    spans.forEach((span) => {
+      const idx = parseInt(span.getAttribute('data-index'), 10);
+      span.style.backgroundColor = set.has(idx) ? 'rgba(255, 235, 59, 0.35)' : 'transparent';
+    });
+  }
+
+  function getSelectedIndices(containerEl) {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return [];
+    const range = sel.getRangeAt(0);
+    const spans = Array.from(containerEl.querySelectorAll('[data-index]'));
+    const selected = [];
+    for (const span of spans) {
+      const r = document.createRange();
+      r.selectNodeContents(span);
+      if (range.compareBoundaryPoints(Range.END_TO_START, r) < 0 &&
+          range.compareBoundaryPoints(Range.START_TO_END, r) > 0) {
+        selected.push(parseInt(span.getAttribute('data-index'), 10));
+      }
+    }
+    return selected;
+  }
+
+  function setHighlightForCurrentPage(indices) {
+    setHighlightMap(prev => ({
+      ...prev,
+      [currentParsedPage]: new Set(indices)
+    }));
+  }
+
+  function handleLeftSelection() {
+    if (!textLayerRef.current) return;
+    const indices = getSelectedIndices(textLayerRef.current);
+    if (indices.length > 0) setHighlightForCurrentPage(indices);
+  }
+
+  function handleRightSelection() {
+    if (!rightTextRef.current) return;
+    const indices = getSelectedIndices(rightTextRef.current);
+    if (indices.length > 0) {
+      setHighlightForCurrentPage(indices);
+      updateLeftHighlights();
+    }
+  }
+
+  useEffect(() => {
+    if (state === 'parsed') {
+      renderPdfPage(currentParsedPage);
+    }
+  }, [state, currentParsedPage]);
+
+  useEffect(() => {
+    if (state === 'parsed') updateLeftHighlights();
+  }, [highlightMap]);
+
+  // Clear left-side highlights when no active selection exists
+  useEffect(() => {
+    function onSelectionChange() {
+      const sel = window.getSelection();
+      if (!sel) return;
+      const isCollapsed = sel.isCollapsed;
+      const leftEl = textLayerRef.current;
+      const rightEl = rightTextRef.current;
+      const anchor = sel.anchorNode;
+      const focus = sel.focusNode;
+      const containsIn = (el, node) => el && node && el.contains(node);
+      const inOurAreas = containsIn(leftEl, anchor) || containsIn(rightEl, anchor) ||
+                         containsIn(leftEl, focus) || containsIn(rightEl, focus);
+      if (state === 'parsed' && (isCollapsed || !inOurAreas)) {
+        setHighlightMap(prev => ({
+          ...prev,
+          [currentParsedPage]: new Set()
+        }));
+      }
+    }
+    document.addEventListener('selectionchange', onSelectionChange);
+    return () => document.removeEventListener('selectionchange', onSelectionChange);
+  }, [state, currentParsedPage]);
+  async function parsePDF(files) {
+    try {
+      const file = files[0]?.file;
+      if (!file) return;
+
+      // Read file as ArrayBuffer
+      const arrayBuffer = await file.arrayBuffer();
+
+      // Configure worker for pdfjs
+      try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+      } catch (e) {
+        // Fallback silently if configuration fails
+      }
+
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      pdfDocRef.current = pdf;
+      const numPages = pdf.numPages;
+
+      if (showProgressBar) {
+        setProgressInfo({ current: 0, total: numPages, currentPage: 0 });
+      }
+
+      const pagesText = [];
+      const pagesItems = [];
+      for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        const text = textContent.items.map(item => item.str).join(' ');
+        pagesText.push(text);
+        pagesItems.push(textContent.items);
+
+        if (showProgressBar) {
+          setProgressInfo(prev => ({ ...prev, current: pageNum, currentPage: pageNum }));
+        }
+      }
+
+      setParsedPages(pagesText);
+      setParsedPageItems(pagesItems);
+      setCurrentParsedPage(1);
+      setState('parsed');
+      setTerminalData('');
+      setProgressInfo({ current: 0, total: 0, currentPage: 0 });
+    } catch (error) {
+      console.error('Parsing failed:', error);
+      setState('error');
+      setErrorMessage(error.message || 'An unexpected error occurred during parsing');
+      setTerminalData('');
+      setProgressInfo({ current: 0, total: 0, currentPage: 0 });
+    }
+  }
+
   function getOutputFilename(originalName, operation) {
     const baseName = originalName.replace('.pdf', '');
     switch (operation) {
@@ -242,7 +451,11 @@ function App() {
     }
 
     const primaryFilename = files[0]?.filename || 'output.pdf';
-    processPDF(activeTab, files, primaryFilename);
+    if (activeTab === 'parse') {
+      parsePDF(files);
+    } else {
+      processPDF(activeTab, files, primaryFilename);
+    }
     return false;
   };
 
@@ -475,81 +688,47 @@ function App() {
 
             {/* Advanced Settings Panel */}
             {useAdvancedSettings && (
-              <div className="bg-muted-50 dark:bg-gray-700 border border-muted-200 dark:border-gray-600 rounded-xl p-6 space-y-6">
-                <h4 className="text-lg font-semibold text-gray-900 dark:text-white border-b border-muted-200 dark:border-gray-600 pb-3">
-                  {t('advancedPdfSettings')}
-                </h4>
-
-                <div className="space-y-6">
-                  <div className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-muted-200 dark:border-gray-600">
-                    <h5 className="text-base font-medium text-gray-900 dark:text-white mb-4 border-b border-muted-200 dark:border-gray-600 pb-2">
-                      {t('essentialSettings')}
-                    </h5>
-
-                    <div className="space-y-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <label className="text-sm font-medium text-gray-900 dark:text-white">
-                          {t('pdfCompatibilityLevel')}
-                        </label>
-                        <select
-                          value={advancedSettings.compatibilityLevel}
-                          onChange={(e) => setAdvancedSettings(prev => ({
-                            ...prev,
-                            compatibilityLevel: e.target.value
-                          }))}
-                          className="input sm:w-48"
-                        >
-                          <option value="1.3">PDF 1.3 (Acrobat 4)</option>
-                          <option value="1.4">PDF 1.4 (Acrobat 5)</option>
-                          <option value="1.5">PDF 1.5 (Acrobat 6)</option>
-                          <option value="1.6">PDF 1.6 (Acrobat 7)</option>
-                          <option value="1.7">PDF 1.7 (Acrobat 8)</option>
-                        </select>
-                      </div>
-
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          id="downsampleImages"
-                          checked={advancedSettings.colorImageSettings.downsample}
-                          onChange={(e) => setAdvancedSettings(prev => ({
-                            ...prev,
-                            colorImageSettings: {
-                              ...prev.colorImageSettings,
-                              downsample: e.target.checked
-                            }
-                          }))}
-                          className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 focus:ring-2"
-                        />
-                        <label htmlFor="downsampleImages" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
-                          {t('downsampleImages')}
-                        </label>
-                      </div>
-
-                      {advancedSettings.colorImageSettings.downsample && (
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                          <label className="text-sm font-medium text-gray-900 dark:text-white">
-                            {t('colorImageResolution')}
-                          </label>
-                          <input
-                            type="number"
-                            value={advancedSettings.colorImageSettings.resolution}
-                            onChange={(e) => setAdvancedSettings(prev => ({
-                              ...prev,
-                              colorImageSettings: {
-                                ...prev.colorImageSettings,
-                                resolution: parseInt(e.target.value) || 300
-                              }
-                            }))}
-                            min="72"
-                            max="1200"
-                            className="input sm:w-32"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="downsampleImages"
+                    checked={advancedSettings.colorImageSettings.downsample}
+                    onChange={(e) => setAdvancedSettings(prev => ({
+                      ...prev,
+                      colorImageSettings: {
+                        ...prev.colorImageSettings,
+                        downsample: e.target.checked
+                      }
+                    }))}
+                    className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 focus:ring-2"
+                  />
+                  <label htmlFor="downsampleImages" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
+                    {t('downsampleImages')}
+                  </label>
                 </div>
+
+                {advancedSettings.colorImageSettings.downsample && (
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <label className="text-sm font-medium text-gray-900 dark:text-white">
+                      {t('colorImageResolution')}
+                    </label>
+                    <input
+                      type="number"
+                      value={advancedSettings.colorImageSettings.resolution}
+                      onChange={(e) => setAdvancedSettings(prev => ({
+                        ...prev,
+                        colorImageSettings: {
+                          ...prev.colorImageSettings,
+                          resolution: parseInt(e.target.value) || 300
+                        }
+                      }))}
+                      min="72"
+                      max="1200"
+                      className="input sm:w-32"
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -614,6 +793,18 @@ function App() {
               >
                 {t('compress')}
               </button>
+              <button
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${activeTab === 'parse' ? 'bg-primary-600 text-white shadow-soft' : 'text-muted-600 dark:text-muted-400 hover:text-gray-900 dark:hover:text-white hover:bg-muted-100 dark:hover:bg-gray-800'}`}
+                onClick={() => {
+                  if (activeTab !== 'parse') {
+                    setActiveTab('parse');
+                    resetForm();
+                  }
+                }}
+                title={t('parse')}
+              >
+                {t('parse')}
+              </button>
             </div>
           </div>
           {/* Right: Buttons */}
@@ -656,6 +847,12 @@ function App() {
               <p className="text-muted-600 dark:text-muted-300">{t('splitDesc')}</p>
             </div>
           )}
+          {activeTab === 'parse' && (
+            <div className="text-center">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">{t('parse')} PDF</h3>
+              <p className="text-muted-600 dark:text-muted-300">{t('parseDesc')}</p>
+            </div>
+          )}
         </div>
 
         {state !== "loading" && state !== "toBeDownloaded" && state !== "error" && (
@@ -672,6 +869,7 @@ function App() {
                   {activeTab === 'compress' && t('compressPdf')}
                   {activeTab === 'merge' && t('mergePdfs')}
                   {activeTab === 'split' && t('splitPdf')}
+                  {activeTab === 'parse' && t('parsePdf')}
                 </button>
               </div>
             )}
@@ -680,25 +878,14 @@ function App() {
 
         {state === "loading" && (
           <div className="card text-center space-y-4">
-            <div className="text-2xl mb-4 animate-spin-slow">⏳</div>
+            <div className="text-2xl mb-4 animate-spin-slow">🔄</div>
             <p className="text-lg font-medium text-gray-900 dark:text-white">
               {t('processing', { count: activeTab === 'merge' ? 's' : '' })}
             </p>
 
             {/* Progress Bar */}
             {showProgressBar && (progressInfo.total > 0 || progressInfo.currentPage > 0) && (
-              <div className="bg-muted-50 dark:bg-gray-700 border border-muted-200 dark:border-gray-600 rounded-xl p-4 mt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {t('processingProgress')}
-                  </h4>
-                  <span className="text-sm text-muted-600 dark:text-muted-400">
-                    {progressInfo.total > 0
-                      ? t('pageOf', { current: progressInfo.currentPage, total: progressInfo.total })
-                      : t('processingPage', { page: progressInfo.currentPage })
-                    }
-                  </span>
-                </div>
+              <>
                 {progressInfo.total > 0 ? (
                   <>
                     <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-3 mb-2">
@@ -719,25 +906,15 @@ function App() {
                     </div>
                   </div>
                 )}
-              </div>
+              </>
             )}
 
             {/* Terminal Output Display */}
             {showTerminalOutput && (
-              <div className="bg-muted-50 dark:bg-gray-700 border border-muted-200 dark:border-gray-600 rounded-xl p-4 mt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {t('terminalOutput')}
-                  </h4>
-                  <span className="text-xs text-muted-600 dark:text-muted-400">
-                    {t('liveOutput')}
-                  </span>
-                </div>
-                <div ref={terminalRef} className="bg-black dark:bg-gray-900 rounded-lg p-3 max-h-32 overflow-y-auto">
-                  <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap break-words">
-                    {terminalData || t('initializing')}
-                  </pre>
-                </div>
+              <div ref={terminalRef} className="bg-black dark:bg-gray-900 rounded-lg p-3 max-h-32 overflow-y-auto">
+                <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap break-words">
+                  {terminalData || t('initializing')}
+                </pre>
               </div>
             )}
           </div>
@@ -756,6 +933,106 @@ function App() {
             <button onClick={resetForm} className="btn-danger">
               {t('tryAgain')}
             </button>
+          </div>
+        )}
+
+        {state === "parsed" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left: PDF Preview */}
+            <div className="card overflow-hidden">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white">{t('pdfPreview')}</h4>
+              </div>
+              <div ref={previewContainerRef} className="border border-muted-200 dark:border-gray-700 rounded-xl overflow-hidden relative">
+                <canvas ref={canvasRef} className="w-full bg-white dark:bg-gray-900"></canvas>
+                <div
+                  ref={textLayerRef}
+                  className="absolute left-0 top-0 w-full h-full"
+                  onMouseUp={handleLeftSelection}
+                />
+              </div>
+            </div>
+
+            {/* Right: Extracted Text */}
+            <div className="card space-y-6">
+              <div className="flex items-center justify-between">
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white">{t('extractedText')}</h4>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary px-4 py-2 rounded-xl"
+                    onClick={() => navigator.clipboard.writeText(parsedPages.join('\n\n'))}
+                  >
+                    {t('copyAll')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary px-4 py-2 rounded-xl"
+                    onClick={() => {
+                      const blob = new Blob([parsedPages.join('\n\n')], { type: 'text/plain' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = (files[0]?.filename || 'output.pdf').replace(/\.pdf$/i, '') + '.txt';
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    }}
+                  >
+                    {t('exportTxt')}
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  className="btn-secondary px-4 py-2 rounded-xl"
+                  onClick={() => setCurrentParsedPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentParsedPage <= 1}
+                >
+                  {t('prev')}
+                </button>
+                <span className="text-sm text-muted-600 dark:text-muted-400">
+                  {t('page')} {currentParsedPage} / {parsedPages.length}
+                </span>
+                <button
+                  type="button"
+                  className="btn-secondary px-4 py-2 rounded-xl"
+                  onClick={() => setCurrentParsedPage(prev => Math.min(parsedPages.length, prev + 1))}
+                  disabled={currentParsedPage >= parsedPages.length}
+                >
+                  {t('next')}
+                </button>
+              </div>
+
+              <div
+                ref={rightTextRef}
+                onMouseUp={handleRightSelection}
+                className="bg-muted-50 dark:bg-gray-700 border border-muted-200 dark:border-gray-600 rounded-xl p-4 text-sm whitespace-pre-wrap break-words text-gray-900 dark:text-white"
+              >
+                {(parsedPageItems[currentParsedPage - 1] || []).length > 0 ? (
+                  (parsedPageItems[currentParsedPage - 1] || []).map((item, idx) => (
+                    <span key={idx} data-index={idx}>
+                      {item.str + ' '}
+                    </span>
+                  ))
+                ) : (
+                  <pre className="text-sm whitespace-pre-wrap break-words">{parsedPages[currentParsedPage - 1] || ''}</pre>
+                )}
+              </div>
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  className="btn-secondary text-lg px-8 py-4 rounded-xl"
+                  onClick={() => navigator.clipboard.writeText(parsedPages[currentParsedPage - 1] || '')}
+                >
+                  {t('copyPage')}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -799,6 +1076,10 @@ function App() {
             <li className="flex items-start gap-2">
               <span className="text-primary-600 dark:text-primary-400 font-bold">•</span>
               <span><strong className="text-gray-900 dark:text-white">{t('split')}:</strong> {t('splitFeature')}</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary-600 dark:text-primary-400 font-bold">•</span>
+              <span><strong className="text-gray-900 dark:text-white">{t('parse')}:</strong> {t('parseFeature')}</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-primary-600 dark:text-primary-400 font-bold">•</span>
