@@ -6,6 +6,8 @@ This is a PDF processing tool that runs entirely in your browser. It provides th
 - **Split PDF**: Extract specific page ranges from a PDF document.
 - **Merge PDF**: Combine multiple PDF files into a single document.
 - **Compress PDF**: Reduce PDF file size while maintaining quality.
+- **Parse PDF**: Extract text content from PDF documents.
+- **Advanced Parse PDF**: Use OCR to extract images, metadata, and other structured information.
 
 ## Context
 
@@ -56,7 +58,12 @@ npm run preview
 ### Compress PDF
 - [x] Multiple quality presets (Screen, eBook, Printer, Prepress, Default)
 - [x] Advanced PDF settings (compatibility level, image downsampling)
-- [ ] Custom Ghostscript commands for power users
+
+### Parse PDF
+- [ ] Extract text content from PDF documents
+
+### Advanced Parse PDF
+- [ ] Use OCR to extract images, metadata, and other structured information
 
 ### Dark Mode
 - [x] Toggle between light and dark themes
