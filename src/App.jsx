@@ -565,7 +565,7 @@ function App() {
       {/* Responsive Navbar Header */}
       <header className="w-full bg-white dark:bg-gray-900 shadow-soft border-b border-muted-200 dark:border-gray-800">
         <nav className="container mx-auto max-w-4xl px-4 py-4 flex flex-row items-center justify-between">
-          {/* Left: Page Title */}
+          {/* Left: Page Title + Top Menu */}
           <div className="flex items-center h-full">
             <img
               src="/web-local-pdf-tools/pdf-file.svg"
@@ -576,6 +576,45 @@ function App() {
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white whitespace-nowrap inline-block align-middle">
               {t('title')}
             </h1>
+            {/* Top bar menu */}
+            <div className="ml-6 flex items-center gap-2">
+              <button
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${activeTab === 'split' ? 'bg-primary-600 text-white shadow-soft' : 'text-muted-600 dark:text-muted-400 hover:text-gray-900 dark:hover:text-white hover:bg-muted-100 dark:hover:bg-gray-800'}`}
+                onClick={() => {
+                  if (activeTab !== 'split') {
+                    setActiveTab('split');
+                    resetForm();
+                  }
+                }}
+                title={t('split')}
+              >
+                {t('split')}
+              </button>
+              <button
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${activeTab === 'merge' ? 'bg-primary-600 text-white shadow-soft' : 'text-muted-600 dark:text-muted-400 hover:text-gray-900 dark:hover:text-white hover:bg-muted-100 dark:hover:bg-gray-800'}`}
+                onClick={() => {
+                  if (activeTab !== 'merge') {
+                    setActiveTab('merge');
+                    resetForm();
+                  }
+                }}
+                title={t('merge')}
+              >
+                {t('merge')}
+              </button>
+              <button
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${activeTab === 'compress' ? 'bg-primary-600 text-white shadow-soft' : 'text-muted-600 dark:text-muted-400 hover:text-gray-900 dark:hover:text-white hover:bg-muted-100 dark:hover:bg-gray-800'}`}
+                onClick={() => {
+                  if (activeTab !== 'compress') {
+                    setActiveTab('compress');
+                    resetForm();
+                  }
+                }}
+                title={t('compress')}
+              >
+                {t('compress')}
+              </button>
+            </div>
           </div>
           {/* Right: Buttons */}
           <div className="flex items-center h-full">
@@ -595,53 +634,7 @@ function App() {
           />
         </div>
 
-        {/* Tabs */}
-        <div className="flex justify-center mb-8">
-          <div className="bg-muted-100 dark:bg-gray-800 p-1 rounded-2xl shadow-soft border border-muted-200 dark:border-gray-700">
-            <button
-              className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 ${activeTab === 'compress'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-soft'
-                : 'text-muted-600 dark:text-muted-400 hover:text-gray-900 dark:hover:text-white'
-                }`}
-              onClick={() => {
-                if (activeTab !== 'compress') {
-                  setActiveTab('compress');
-                  resetForm();
-                }
-              }}
-            >
-              {t('compress')}
-            </button>
-            <button
-              className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 ${activeTab === 'merge'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-soft'
-                : 'text-muted-600 dark:text-muted-400 hover:text-gray-900 dark:hover:text-white'
-                }`}
-              onClick={() => {
-                if (activeTab !== 'merge') {
-                  setActiveTab('merge');
-                  resetForm();
-                }
-              }}
-            >
-              {t('merge')}
-            </button>
-            <button
-              className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 ${activeTab === 'split'
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-soft'
-                : 'text-muted-600 dark:text-muted-400 hover:text-gray-900 dark:hover:text-white'
-                }`}
-              onClick={() => {
-                if (activeTab !== 'split') {
-                  setActiveTab('split');
-                  resetForm();
-                }
-              }}
-            >
-              {t('split')}
-            </button>
-          </div>
-        </div>
+        {/* Tabs removed per specification: switching via top bar menu only */}
 
         {/* Tab Content */}
         <div className="card mb-8">
