@@ -6,19 +6,21 @@ const resources = {
     translation: {
       // Header
       "title": "Local PDF Tools",
-      "subtitle": "Compress, merge, and split PDF files locally in your browser. No uploads required - everything stays on your device.",
+      "subtitle": "Compress, merge, split, parse and convert PDF files locally in your browser. No uploads required - everything stays on your device.",
       
       // Tabs
       "compress": "Compress",
       "merge": "Merge", 
       "split": "Split",
       "parse": "Parse",
+      "convert": "Convert",
       
       // Tab descriptions
       "compressDesc": "Reduce PDF file size while maintaining quality.",
       "mergeDesc": "Combine multiple PDF files into a single document.",
       "splitDesc": "Extract specific page ranges from a PDF document.",
       "parseDesc": "Extract text from PDF pages for copy or export.",
+      "convertDesc": "Convert PDF files to images or images to PDF.",
       
       // File input
       "chooseFiles": "Choose PDF file{{count}} to {{operation}}",
@@ -56,6 +58,7 @@ const resources = {
       "mergePdfs": "Merge PDFs", 
       "splitPdf": "Split PDF",
       "parsePdf": "Parse PDF",
+      "convertFile": "Convert File",
       "processAgain": "Process Again",
       "chooseNewFiles": "Choose New Files",
       "tryAgain": "Try Again",
@@ -80,6 +83,8 @@ const resources = {
       "pageOf": "Page {{current}} of {{total}}",
       "percentComplete": "{{percent}}% Complete",
       "pagesProgress": "{{current}}/{{total}} pages",
+      "conversionComplete": "Conversion Complete",
+      "preview": "Preview",
       
       // Error messages
       "errorOccurred": "An error occurred while processing your PDF:",
@@ -95,6 +100,10 @@ const resources = {
       "mergeFeature": "Combine multiple PDFs into one document", 
       "splitFeature": "Extract specific page ranges from a PDF",
       "parseFeature": "Extract text content from PDFs, with copy and export options",
+      "convertFeature": "Convert PDFs to JPG, PNG, JPEG or BMP images, and images to PDF",
+      // Convert feature
+      "selectFileToConvert": "Select a file to convert",
+      "convertTo": "Convert to:",
       "progressBarFeature": "Visual progress tracking with page-by-page processing status",
       
       // Privacy section
@@ -116,19 +125,21 @@ const resources = {
     translation: {
       // Header
       "title": "本地 PDF 工具",
-      "subtitle": "在浏览器中本地压缩、合并和拆分 PDF 文件。无需上传 - 一切都保留在您的设备上。",
+      "subtitle": "在浏览器中本地压缩、合并、拆分、解析和转换 PDF 文件。无需上传 - 一切都保留在您的设备上。",
       
       // Tabs
       "compress": "压缩",
       "merge": "合并",
       "split": "拆分",
       "parse": "解析",
+      "convert": "文件转换",
       
       // Tab descriptions  
       "compressDesc": "在保持质量的同时减小 PDF 文件大小。",
       "mergeDesc": "将多个 PDF 文件合并为单个文档。",
       "splitDesc": "从 PDF 文档中提取特定页面范围。",
       "parseDesc": "提取 PDF 各页的文本，支持复制与导出。",
+      "convertDesc": "将 PDF 文件转换为图片或将图片转换为 PDF。",
       
       // File input
       "chooseFiles": "选择要{{operation}}的 PDF 文件{{count}}",
@@ -166,6 +177,7 @@ const resources = {
       "mergePdfs": "合并 PDFs",
       "splitPdf": "拆分 PDF",
       "parsePdf": "解析 PDF",
+      "convertFile": "转换文件",
       "processAgain": "重新处理",
       "chooseNewFiles": "选择新文件",
       "tryAgain": "重试",
@@ -190,6 +202,8 @@ const resources = {
       "pageOf": "第 {{current}} 页，共 {{total}} 页",
       "percentComplete": "{{percent}}% 完成",
       "pagesProgress": "{{current}}/{{total}} 页",
+      "conversionComplete": "转换完成",
+      "preview": "预览",
       
       // Error messages
       "errorOccurred": "处理您的 PDF 时发生错误：",
@@ -205,6 +219,10 @@ const resources = {
       "mergeFeature": "将多个 PDF 合并为一个文档",
       "splitFeature": "从 PDF 中提取特定页面范围",
       "parseFeature": "提取 PDF 文本内容，支持复制与导出",
+      "convertFeature": "将 PDF 转换为 JPG、PNG、JPEG 或 BMP 图片，以及将图片转换为 PDF",
+      // Convert feature
+      "selectFileToConvert": "选择要转换的文件",
+      "convertTo": "转换为：",
       "progressBarFeature": "带有逐页处理状态的可视化进度跟踪",
       
       // Privacy section

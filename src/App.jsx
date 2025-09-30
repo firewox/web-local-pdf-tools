@@ -6,18 +6,56 @@ import RightButtonBar from './components/RightButtonBar.jsx';
 
 function loadPDFData(response, filename) {
   return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("GET", response);
-    xhr.responseType = "arraybuffer";
-    xhr.onload = function () {
-      window.URL.revokeObjectURL(response);
-      const blob = new Blob([xhr.response], { type: "application/pdf" });
-      const pdfURL = window.URL.createObjectURL(blob);
-      const size = xhr.response.byteLength;
-      resolve({ pdfURL, size });
-    };
-    xhr.onerror = reject;
-    xhr.send();
+    try {
+      // If response is already a blob URL (from createSimplePdfWithImage)
+      if (typeof response === 'string' && response.startsWith('blob:')) {
+        // Directly use the blob URL without unnecessary conversion
+        // Create a quick HEAD request to get file size without downloading full content
+        const xhr = new XMLHttpRequest();
+        xhr.open('HEAD', response);
+        xhr.onload = function() {
+          try {
+            // For blob URLs, we can't get the actual size from headers
+            // So we estimate based on response type
+            const estimatedSize = 0; // Will be updated later when actual data is loaded
+            resolve({ pdfURL: response, size: estimatedSize });
+          } catch (error) {
+            console.error('Error in HEAD request:', error);
+            // Fallback to using the original URL directly
+            resolve({ pdfURL: response, size: 0 });
+          }
+        };
+        xhr.onerror = function() {
+          // If HEAD request fails, just use the original URL
+          resolve({ pdfURL: response, size: 0 });
+        };
+        xhr.send();
+      } else {
+        // Original handling for array buffer data
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", response);
+        xhr.responseType = "arraybuffer";
+        xhr.onload = function () {
+          try {
+            window.URL.revokeObjectURL(response);
+            const blob = new Blob([xhr.response], { type: "application/pdf" });
+            const pdfURL = window.URL.createObjectURL(blob);
+            const size = xhr.response.byteLength;
+            resolve({ pdfURL, size });
+          } catch (error) {
+            console.error('Error creating blob from array buffer:', error);
+            reject(error);
+          }
+        };
+        xhr.onerror = function () {
+          reject(new Error('Failed to load PDF data'));
+        };
+        xhr.send();
+      }
+    } catch (error) {
+      console.error('Error in loadPDFData:', error);
+      reject(error);
+    }
   });
 }
 
@@ -47,6 +85,10 @@ function App() {
   const rightTextRef = useRef(null);
   const [parsedPageItems, setParsedPageItems] = useState([]);
   const [highlightMap, setHighlightMap] = useState({});
+  
+  // PDF preview and file info states
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [fileInfo, setFileInfo] = useState(null);
 
   // PDF Settings presets
   const PDF_SETTINGS = {
@@ -66,6 +108,357 @@ function App() {
     }
   });
   const [useAdvancedSettings, setUseAdvancedSettings] = useState(false);
+  
+  // Convert feature state
+  const [convertFormat, setConvertFormat] = useState("");
+  const [supportedFormats, setSupportedFormats] = useState([]);
+  
+  // PDF to image page selection state
+  const [selectedPages, setSelectedPages] = useState("");
+  const [pdfPageCount, setPdfPageCount] = useState(0);
+
+  // PDF Preview component for converted PDFs
+  const PdfPreview = ({ url }) => {
+    const [pdfDoc, setPdfDoc] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const canvasRef = useRef(null);
+    const previewContainerRef = useRef(null);
+
+    useEffect(() => {
+      if (!url) {
+        setLoading(false);
+        return;
+      }
+
+      const loadPdf = async () => {
+        try {
+          setLoading(true);
+          setError(null);
+          
+          // Configure worker for pdfjs
+          try {
+            // Try multiple worker sources for compatibility
+            if (typeof window !== 'undefined' && window.pdfjsLib) {
+              // First try the standard worker
+              try {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+              } catch (e) {
+                // Fallback to CDN worker
+                pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to configure PDF.js worker:', e);
+          }
+
+          // Load the PDF document with optimized options for better performance
+          const loadingTask = pdfjsLib.getDocument({
+            url: url,
+            cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/' + pdfjsLib.version + '/cmaps/',
+            cMapPacked: true,
+            disableAutoFetch: false, // Enable auto-fetch for better streaming
+            disableStream: false,    // Enable streaming for faster initial load
+            enableXfa: false,        // Disable XFA forms for better performance
+            ignoreErrors: true,      // Ignore non-critical errors
+            useSystemFonts: false    // Use embedded fonts to ensure rendering consistency
+          });
+          
+          const pdf = await loadingTask.promise;
+          setPdfDoc(pdf);
+          setTotalPages(pdf.numPages);
+          setCurrentPage(1);
+          setLoading(false);
+        } catch (error) {
+          console.error('Error loading PDF for preview:', error);
+          setError(error.message || 'Failed to load PDF');
+          setLoading(false);
+        }
+      };
+
+      loadPdf();
+    }, [url]);
+
+    useEffect(() => {
+      if (!pdfDoc) return;
+
+      const renderPage = async () => {
+        try {
+          // Function to wait for an element to be available with improved reliability
+          const waitForElement = async (elementRef, maxWaitTime = 3000, checkInterval = 150) => {
+            return new Promise((resolve) => {
+              let checks = 0;
+              const maxChecks = maxWaitTime / checkInterval;
+              const interval = setInterval(() => {
+                if (elementRef.current && document.contains(elementRef.current)) {
+                  clearInterval(interval);
+                  resolve(true);
+                } else if (checks >= maxChecks) {
+                  clearInterval(interval);
+                  resolve(false);
+                }
+                checks++;
+              }, checkInterval);
+            });
+          };
+
+          setLoading(true);
+          setError(null); // Clear any previous errors
+
+          // First, ensure the PDF document is loaded
+          if (!pdfDoc) {
+            throw new Error('PDF document not loaded');
+          }
+
+          // Function to create and attach a temporary canvas to DOM as a last resort
+          const createTemporaryCanvas = () => {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.id = 'temporary-pdf-canvas';
+            tempCanvas.className = 'w-full h-auto max-h-96 object-contain';
+            
+            // Try to find an appropriate container in the DOM
+            let containerElement = previewContainerRef.current || 
+                                  document.querySelector('.border.rounded-xl.overflow-hidden') ||
+                                  document.querySelector('.p-4.space-y-4') ||
+                                  document.body;
+            
+            if (containerElement) {
+              containerElement.appendChild(tempCanvas);
+              // Store reference to the temporary canvas so we can remove it later
+              if (!window.tempPdfCanvas) {
+                window.tempPdfCanvas = [];
+              }
+              window.tempPdfCanvas.push(tempCanvas);
+            }
+            
+            return tempCanvas;
+          };
+
+          // Enhanced canvas lookup with multiple strategies
+          const findOrCreateCanvas = () => {
+            // Strategy 1: Use the ref directly
+            if (canvasRef.current && document.contains(canvasRef.current)) {
+              return canvasRef.current;
+            }
+            
+            // Strategy 2: Try to find any canvas in the DOM
+            let canvas = document.querySelector('canvas');
+            if (canvas) {
+              return canvas;
+            }
+            
+            // Strategy 3: Try to find canvas with specific attributes
+            canvas = document.querySelector('[ref="canvasRef"]');
+            if (canvas) {
+              return canvas;
+            }
+            
+            // Strategy 4: Create a temporary canvas and attach it to DOM
+            console.warn('Creating temporary canvas element as last resort');
+            return createTemporaryCanvas();
+          };
+
+          // Wait for both canvas and container elements to be available and attached to DOM
+          const canvasAvailable = await waitForElement(canvasRef, 3000);
+          const containerAvailable = await waitForElement(previewContainerRef, 3000);
+
+          // Find or create canvas element with enhanced logic
+          let canvas = findOrCreateCanvas();
+          
+          // If canvas is still not found, create a new one
+          if (!canvas) {
+            canvas = createTemporaryCanvas();
+          }
+
+          // Ensure we have a valid canvas before proceeding
+          if (!canvas) {
+            throw new Error('Failed to find or create a valid canvas element');
+          }
+
+          // For cases where canvasRef is still null but we have a canvas, use that canvas
+          let canvasToUse = canvasRef.current || canvas;
+
+          // Ensure the canvas is attached to DOM
+          if (!document.contains(canvasToUse)) {
+            // Try to attach it if it's not already attached
+            const containerElement = previewContainerRef.current || document.body;
+            if (containerElement && !containerElement.contains(canvasToUse)) {
+              try {
+                containerElement.appendChild(canvasToUse);
+              } catch (e) {
+                console.warn('Failed to attach canvas to DOM, proceeding anyway:', e);
+              }
+            }
+          }
+
+          const page = await pdfDoc.getPage(currentPage);
+          const viewportBase = page.getViewport({ scale: 1 });
+          
+          // More robust clientWidth access with fallback calculations
+          let containerWidth = viewportBase.width;
+          if (previewContainerRef.current) {
+            containerWidth = previewContainerRef.current.clientWidth || 
+                            previewContainerRef.current.offsetWidth || 
+                            window.innerWidth * 0.8 || 
+                            viewportBase.width;
+          } else {
+            // Fallback when container ref is not available
+            containerWidth = window.innerWidth * 0.8 || viewportBase.width;
+          }
+          
+          // Calculate optimal scale with upper and lower bounds
+          const scale = Math.max(0.5, Math.min(containerWidth / viewportBase.width, 2.0));
+          const viewport = page.getViewport({ scale });
+
+          // Enhanced canvas validation
+          if (!canvasToUse) {
+            throw new Error('Canvas element reference is null after all attempts');
+          }
+          
+          if (typeof canvasToUse.getContext !== 'function') {
+            throw new Error('Canvas does not support getContext method');
+          }
+          
+          // Try to get context with fallback
+          let ctx = canvasToUse.getContext('2d');
+          if (!ctx) {
+            // Last resort: try to create a new canvas element if context creation fails
+            const tempCanvas = document.createElement('canvas');
+            ctx = tempCanvas.getContext('2d');
+            if (!ctx) {
+              throw new Error('Failed to get 2D context from any canvas');
+            }
+          }
+          
+          // Ensure canvas has proper dimensions with error handling
+          try {
+            canvasToUse.width = viewport.width;
+            canvasToUse.height = viewport.height;
+          } catch (dimensionError) {
+            console.warn('Failed to set canvas dimensions, using fallback:', dimensionError);
+            // Fallback to default dimensions if setting fails
+            canvasToUse.width = 800;
+            canvasToUse.height = 1056;
+          }
+
+          const renderContext = {
+            canvasContext: ctx,
+            viewport: viewport,
+            enableWebGL: false,
+            renderInteractiveForms: false
+          };
+
+          // Add timeout to prevent hanging renders - increased timeout for image PDFs
+          const renderPromise = page.render(renderContext).promise;
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Render timeout after 30 seconds')), 30000);
+          });
+
+          // Use Promise.race to handle render timeouts
+          await Promise.race([renderPromise, timeoutPromise]);
+          setLoading(false);
+        } catch (error) {
+          console.error('Error rendering PDF page:', error);
+          // Improve error message to be more user-friendly
+          let userErrorMessage = 'Failed to render PDF page';
+          if (error.message.includes('null')) {
+            userErrorMessage = 'PDF preview not available: Canvas element not ready';
+          } else if (error.message.includes('timeout')) {
+            userErrorMessage = 'PDF preview timed out. Please try again.';
+          }
+          setError(userErrorMessage);
+          setLoading(false);
+        }
+      };
+
+      renderPage();
+    }, [pdfDoc, currentPage]);
+
+    const goToPrevPage = () => {
+      setCurrentPage(prev => Math.max(1, prev - 1));
+    };
+
+    const goToNextPage = () => {
+      setCurrentPage(prev => Math.min(totalPages, prev + 1));
+    };
+
+    if (!url) {
+      return (
+        <div className="p-4 space-y-4">
+          <div className="text-center py-8">
+            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+              <span className="text-2xl font-bold text-gray-600 dark:text-gray-400">PDF</span>
+            </div>
+            <p className="text-muted-600 dark:text-muted-400">
+              No PDF available for preview
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (loading) {
+      return (
+        <div className="p-4 space-y-4">
+          <div className="text-center py-8">
+            <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+            </div>
+            <p className="text-muted-600 dark:text-muted-400">
+              Loading PDF preview...
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="p-4 space-y-4">
+          <div className="text-center py-8">
+            <div className="w-16 h-16 mx-auto mb-4 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
+              <span className="text-2xl font-bold text-red-600 dark:text-red-400">PDF</span>
+            </div>
+            <p className="text-muted-600 dark:text-muted-400">
+              PDF preview not available: {error}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="p-4 space-y-4">
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={goToPrevPage}
+              disabled={currentPage <= 1}
+              className="btn-secondary px-3 py-1.5 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {t('prev')}
+            </button>
+            <span className="text-sm text-muted-600 dark:text-muted-400">
+              {t('page')} {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={goToNextPage}
+              disabled={currentPage >= totalPages}
+              className="btn-secondary px-3 py-1.5 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {t('next')}
+            </button>
+          </div>
+        )}
+        
+        <div ref={previewContainerRef} className="border border-muted-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-900">
+          <canvas ref={canvasRef} className="w-full h-auto max-h-96 object-contain" />
+        </div>
+      </div>
+    );
+  };
 
   // Auto-scroll terminal output to bottom
   useEffect(() => {
@@ -107,7 +500,8 @@ function App() {
         customCommand: useCustomCommand ? customCommand : null,
         advancedSettings: useAdvancedSettings ? advancedSettings : null,
         showTerminalOutput: showTerminalOutput, // Pass terminal output setting to worker
-        showProgressBar: showProgressBar // Pass progress bar setting to worker
+        showProgressBar: showProgressBar, // Pass progress bar setting to worker
+        convertFormat: activeTab === 'convert' ? convertFormat : null
       };
 
       if (operation === 'merge') {
@@ -172,25 +566,73 @@ function App() {
   async function renderPdfPage(pageNum) {
     try {
       const pdf = pdfDocRef.current;
-      if (!pdf || !canvasRef.current || !previewContainerRef.current) return;
+      if (!pdf) return;
+      
+      // Wait for refs to be available with improved mechanism
+      let attempts = 0;
+      const maxAttempts = 20; // Increase attempts
+      const retryDelay = 150; // Increase delay slightly
+      
+      while ((!canvasRef.current || !previewContainerRef.current) && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        attempts++;
+      }
+      
+      // Enhanced check for refs availability
+      if (!canvasRef.current || !previewContainerRef.current) {
+        throw new Error('Canvas or container not properly initialized after waiting');
+      }
+
+      // Additional check for DOM readiness
+      if (!document.contains(canvasRef.current) || !document.contains(previewContainerRef.current)) {
+        // Try one more time with a longer delay
+        await new Promise(resolve => setTimeout(resolve, 300));
+        if (!document.contains(canvasRef.current) || !document.contains(previewContainerRef.current)) {
+          throw new Error('Canvas or container elements not attached to DOM');
+        }
+      }
+
       const page = await pdf.getPage(pageNum);
       const viewportBase = page.getViewport({ scale: 1 });
-      const containerWidth = previewContainerRef.current.clientWidth || viewportBase.width;
+      
+      // More robust clientWidth access
+      let containerWidth = viewportBase.width;
+      if (previewContainerRef.current) {
+        containerWidth = previewContainerRef.current.clientWidth || 
+                        previewContainerRef.current.offsetWidth || 
+                        viewportBase.width;
+      }
+      
       const scale = containerWidth / viewportBase.width;
       const viewport = page.getViewport({ scale });
 
       const canvas = canvasRef.current;
+      // Enhanced canvas initialization checks
+      if (!canvas) {
+        throw new Error('Canvas element is null');
+      }
+      
+      if (typeof canvas.getContext !== 'function') {
+        throw new Error('Canvas getContext is not a function');
+      }
+      
       const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Failed to get 2D context from canvas');
+      }
+      
       const dpr = window.devicePixelRatio || 1;
       canvas.style.width = `${viewport.width}px`;
       canvas.style.height = `${viewport.height}px`;
       canvas.width = Math.floor(viewport.width * dpr);
       canvas.height = Math.floor(viewport.height * dpr);
+      
       const renderContext = {
         canvasContext: ctx,
         viewport,
         transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : null
       };
+      
       await page.render(renderContext).promise;
 
       const textLayerEl = textLayerRef.current;
@@ -224,7 +666,10 @@ function App() {
       });
 
       updateLeftHighlights();
-    } catch {}
+    } catch (error) {
+      console.error('Error in renderPdfPage:', error);
+      // Don't silently ignore errors, but handle them gracefully
+    }
   }
 
   function updateLeftHighlights() {
@@ -364,7 +809,7 @@ function App() {
   }
 
   function getOutputFilename(originalName, operation) {
-    const baseName = originalName.replace('.pdf', '');
+    const baseName = originalName.replace(/\.[^/.]+$/, ''); // Remove extension
     switch (operation) {
       case 'compress':
         return `${baseName}-compressed.pdf`;
@@ -372,8 +817,324 @@ function App() {
         return `merged-${Date.now()}.pdf`;
       case 'split':
         return `${baseName}-split-${splitRange.startPage}-${splitRange.endPage}.pdf`;
+      case 'convert':
+        return `${baseName}.${convertFormat}`;
       default:
         return `${baseName}-processed.pdf`;
+    }
+  }
+
+  // Helper function to parse page ranges like "1,3-5,7"
+  function parsePageSelection(selection, totalPages) {
+    if (!selection || selection.trim() === '') {
+      // If no selection, return all pages
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    
+    const pages = new Set();
+    const parts = selection.split(',');
+    
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+      
+      // Check if it's a range (e.g., 3-5)
+      const rangeMatch = trimmed.match(/^(\d+)-(\d+)$/);
+      if (rangeMatch) {
+        const start = parseInt(rangeMatch[1]);
+        const end = parseInt(rangeMatch[2]);
+        
+        if (!isNaN(start) && !isNaN(end) && start <= end && start >= 1 && end <= totalPages) {
+          for (let i = start; i <= end; i++) {
+            pages.add(i);
+          }
+        }
+      } else {
+        // Check if it's a single page
+        const pageNum = parseInt(trimmed);
+        if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
+          pages.add(pageNum);
+        }
+      }
+    }
+    
+    return Array.from(pages).sort((a, b) => a - b);
+  }
+
+  async function convertFile(inputFiles, filename) {
+    setState("loading");
+    setTerminalData(""); // Clear previous terminal data
+    setProgressInfo({ current: 0, total: 0, currentPage: 0 }); // Reset progress
+
+    try {
+      const file = inputFiles[0].file;
+      const fileType = file.type;
+      
+      // For PDF to image conversion
+      if (fileType === 'application/pdf' && ['jpg', 'jpeg', 'png', 'bmp'].includes(convertFormat)) {
+        // Configure worker for pdfjs
+        try {
+          pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+        } catch (e) {
+          // Fallback silently if configuration fails
+        }
+
+        const arrayBuffer = await file.arrayBuffer();
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
+        const numPages = pdf.numPages;
+        
+        // Set page count for UI display
+        setPdfPageCount(numPages);
+        
+        // Parse user selected pages or use all pages
+        const pagesToConvert = parsePageSelection(selectedPages, numPages);
+        setProgressInfo({ current: 0, total: pagesToConvert.length, currentPage: 0 });
+
+        // Convert selected pages to images
+        const downloadLinks = [];
+        
+        for (const pageNum of pagesToConvert) {
+          const page = await pdf.getPage(pageNum);
+          const viewport = page.getViewport({ scale: 2.0 });
+          
+          const canvas = document.createElement('canvas');
+          // Safely access getContext with null check
+          if (!canvas || typeof canvas.getContext !== 'function') {
+            throw new Error('Canvas is not properly initialized');
+          }
+          const context = canvas.getContext('2d');
+          if (!context) {
+            throw new Error('Failed to get 2D context from canvas');
+          }
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          
+          const renderContext = {
+            canvasContext: context,
+            viewport: viewport
+          };
+          
+          await page.render(renderContext).promise;
+          
+          // Convert canvas to image
+          const imageUrl = canvas.toDataURL(`image/${convertFormat === 'jpg' ? 'jpeg' : convertFormat}`);
+          
+          // Create blob from data URL
+          const response = await fetch(imageUrl);
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          
+          // Create filename with page number
+          const baseName = filename.replace(/\.pdf$/i, '');
+          const pageFilename = numPages > 1 ? 
+            `${baseName}-page-${pageNum}.${convertFormat}` : 
+            `${baseName}.${convertFormat}`;
+          
+          downloadLinks.push({
+            url: url,
+            filename: pageFilename,
+            operation: 'convert',
+            page: pageNum,
+            totalPages: numPages
+          });
+          
+          // Update progress
+          setProgressInfo({ current: pageNum, total: numPages, currentPage: pageNum });
+        }
+        
+        setDownloadLinks(downloadLinks);
+      }
+      // For image to PDF conversion - support multiple images
+      else if (fileType.startsWith('image/') && convertFormat === 'pdf') {
+        let pdfArrayBuffer;
+        
+        // Check if multiple images are selected
+        if (inputFiles.length > 1) {
+          // Create PDF with multiple images
+          pdfArrayBuffer = await createPdfWithMultipleImages(inputFiles);
+        } else {
+          // Read single image file
+          const reader = new FileReader();
+          const imageDataUrl = await new Promise((resolve) => {
+            reader.onload = (e) => resolve(e.target.result);
+            reader.readAsDataURL(file);
+          });
+          
+          // Create PDF using jsPDF library
+          pdfArrayBuffer = await createSimplePdfWithImage(imageDataUrl);
+        }
+        
+        // Convert the ArrayBuffer to a Blob
+        const pdfBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
+        
+        // Create a blob URL for the PDF
+        const pdfBlobUrl = URL.createObjectURL(pdfBlob);
+        
+        // Set file info with actual size
+        const fileSize = pdfBlob.size;
+        const pdfFileName = getOutputFilename(filename, 'convert');
+        
+        // Always provide the download link first
+        setDownloadLinks([{
+          url: pdfBlobUrl,
+          filename: pdfFileName,
+          operation: 'convert'
+        }]);
+        
+        // Load the PDF data for preview with optimized handling
+        try {
+          setTerminalData('Loading PDF for preview...');
+          
+          // Directly use the blob URL for preview without extra conversion
+          setPdfUrl(pdfBlobUrl);
+          setFileInfo({
+            name: pdfFileName,
+            size: fileSize,
+            type: 'application/pdf',
+            lastModified: new Date().getTime()
+          });
+          
+          // No need to update download links again - we're using the same URL
+        } catch (previewError) {
+          console.error('Error setting up PDF for preview:', previewError);
+          // Keep the original blob URL for download
+        }
+      }
+      
+      setState("toBeDownloaded");
+      setTerminalData(""); // Clear terminal output when done
+      setProgressInfo({ current: 0, total: 0, currentPage: 0 }); // Reset progress when done
+      
+    } catch (error) {
+      console.error("Conversion failed:", error);
+      setState("error");
+      setErrorMessage(error.message || "An unexpected error occurred during conversion");
+      setTerminalData(""); // Clear terminal output on error
+      setProgressInfo({ current: 0, total: 0, currentPage: 0 }); // Reset progress on error
+    }
+  }
+
+  // Helper function to create a PDF with multiple images
+  async function createPdfWithMultipleImages(inputFiles) {
+    try {
+      // Dynamically import jsPDF to avoid bundling it unnecessarily
+      const { jsPDF } = await import('jspdf');
+      
+      // Create a new jsPDF instance
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      // PDF page dimensions
+      const pdfWidth = doc.internal.pageSize.getWidth();
+      const pdfHeight = doc.internal.pageSize.getHeight();
+      
+      // Process each image and add to PDF
+      for (let i = 0; i < inputFiles.length; i++) {
+        const file = inputFiles[i].file;
+        
+        // Read image file as Data URL
+        const imageDataUrl = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.readAsDataURL(file);
+        });
+        
+        // Create image element to get dimensions
+        const img = new Image();
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = imageDataUrl;
+        });
+        
+        // Get image dimensions
+        const imgWidth = img.width;
+        const imgHeight = img.height;
+        
+        // Calculate scaling to fit image in PDF while maintaining aspect ratio
+        const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+        const width = imgWidth * ratio;
+        const height = imgHeight * ratio;
+        
+        // Center the image on the page
+        const x = (pdfWidth - width) / 2;
+        const y = (pdfHeight - height) / 2;
+        
+        // Add a new page for all images except the first one
+        if (i > 0) {
+          doc.addPage();
+        }
+        
+        // Add image to PDF
+        doc.addImage(imageDataUrl, 'JPEG', x, y, width, height);
+        
+        // Update progress
+        setProgressInfo({ current: i + 1, total: inputFiles.length, currentPage: 0 });
+      }
+      
+      // Return the PDF as array buffer
+      const pdfData = doc.output('arraybuffer');
+      return pdfData;
+    } catch (error) {
+      console.error('Error creating PDF from multiple images:', error);
+      throw error;
+    }
+  }
+  
+  // Helper function to create a simple PDF with an image
+  // This is a simplified version for demonstration
+  async function createSimplePdfWithImage(imageDataUrl) {
+    try {
+      // Dynamically import jsPDF to avoid bundling it unnecessarily
+      const { jsPDF } = await import('jspdf');
+      
+      // Create a new jsPDF instance
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      // Create an image element to get dimensions
+      const img = new Image();
+      const loadImage = new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = imageDataUrl;
+      });
+      
+      await loadImage;
+      
+      // Get image dimensions
+      const imgWidth = img.width;
+      const imgHeight = img.height;
+      
+      // Calculate dimensions to fit in PDF (A4 size in mm)
+      const pdfWidth = doc.internal.pageSize.getWidth();
+      const pdfHeight = doc.internal.pageSize.getHeight();
+      
+      // Calculate scaling to fit image in PDF while maintaining aspect ratio
+      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
+      const width = imgWidth * ratio;
+      const height = imgHeight * ratio;
+      
+      // Center the image on the page
+      const x = (pdfWidth - width) / 2;
+      const y = (pdfHeight - height) / 2;
+      
+      // Add image to PDF
+      doc.addImage(imageDataUrl, 'JPEG', x, y, width, height);
+      
+      // Return the PDF as array buffer
+      const pdfData = doc.output('arraybuffer');
+      return pdfData;
+    } catch (error) {
+      console.error('Error creating PDF from image:', error);
+      throw error;
     }
   }
 
@@ -386,8 +1147,8 @@ function App() {
     }));
 
     // For compress and split operations, replace existing files (single file only)
-    // For merge, allow multiple files
-    if (activeTab === 'merge') {
+    // For merge and image to PDF conversion, allow multiple files
+    if (activeTab === 'merge' || (activeTab === 'convert' && fileObjects.length > 0 && fileObjects[0].file.type.startsWith('image/'))) {
       setFiles(prevFiles => [...prevFiles, ...fileObjects]);
     } else {
       // Clean up previous files for compress/split
@@ -396,6 +1157,39 @@ function App() {
       });
       setFiles(fileObjects.slice(0, 1)); // Only take the first file for compress/split
     }
+    
+    // Update supported formats for convert feature
+    if (activeTab === 'convert' && selectedFiles.length > 0) {
+      const file = selectedFiles[0];
+      const fileType = file.type.toLowerCase();
+      const fileName = file.name.toLowerCase();
+      
+      let formats = [];
+      
+      // Check if file is PDF
+      if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
+        formats = [
+          { value: 'jpg', label: 'JPG' },
+          { value: 'png', label: 'PNG' },
+          { value: 'jpeg', label: 'JPEG' },
+          { value: 'bmp', label: 'BMP' }
+        ];
+      } 
+      // Check if file is an image
+      else if (fileType.startsWith('image/') || 
+               fileName.endsWith('.jpg') || 
+               fileName.endsWith('.jpeg') || 
+               fileName.endsWith('.png') || 
+               fileName.endsWith('.bmp')) {
+        formats = [
+          { value: 'pdf', label: 'PDF' }
+        ];
+      }
+      
+      setSupportedFormats(formats);
+      setConvertFormat(formats.length > 0 ? formats[0].value : '');
+    }
+    
     setState("selected");
   };
 
@@ -450,9 +1244,16 @@ function App() {
       }
     }
 
+    if (activeTab === 'convert' && !convertFormat) {
+      alert('Please select a target format for conversion');
+      return false;
+    }
+
     const primaryFilename = files[0]?.filename || 'output.pdf';
     if (activeTab === 'parse') {
       parsePDF(files);
+    } else if (activeTab === 'convert') {
+      convertFile(files, primaryFilename);
     } else {
       processPDF(activeTab, files, primaryFilename);
     }
@@ -483,6 +1284,9 @@ function App() {
         resolution: 300
       }
     });
+    // Reset convert feature state
+    setConvertFormat("");
+    setSupportedFormats([]);
   };
 
   const processAgain = () => {
@@ -498,7 +1302,7 @@ function App() {
   };
 
   const renderFileInput = () => {
-    const accept = "application/pdf";
+    const accept = activeTab === 'convert' ? "application/pdf,image/*,.jpg,.jpeg,.png,.bmp" : "application/pdf";
     const multiple = activeTab === 'merge';
 
     return (
@@ -686,6 +1490,25 @@ function App() {
               </label>
             </div>
 
+            {/* Page Selection for PDF to Image Conversion */}
+            {activeTab === 'convert' && convertFormat && ['jpg', 'jpeg', 'png', 'bmp'].includes(convertFormat) && pdfPageCount > 0 && (
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-gray-900 dark:text-white">
+                  {t('selectPages')} (1-{pdfPageCount})
+                </label>
+                <input
+                  type="text"
+                  placeholder={t('pageSelectionHint')}
+                  value={selectedPages}
+                  onChange={(e) => setSelectedPages(e.target.value)}
+                  className="input"
+                />
+                <p className="text-xs text-muted-600 dark:text-muted-400">
+                  {t('pageSelectionHelp')}
+                </p>
+              </div>
+            )}
+
             {/* Advanced Settings Panel */}
             {useAdvancedSettings && (
               <div className="space-y-4">
@@ -805,6 +1628,18 @@ function App() {
               >
                 {t('parse')}
               </button>
+              <button
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${activeTab === 'convert' ? 'bg-primary-600 text-white shadow-soft' : 'text-muted-600 dark:text-muted-400 hover:text-gray-900 dark:hover:text-white hover:bg-muted-100 dark:hover:bg-gray-800'}`}
+                onClick={() => {
+                  if (activeTab !== 'convert') {
+                    setActiveTab('convert');
+                    resetForm();
+                  }
+                }}
+                title={t('convert')}
+              >
+                {t('convert')}
+              </button>
             </div>
           </div>
           {/* Right: Buttons */}
@@ -853,26 +1688,56 @@ function App() {
               <p className="text-muted-600 dark:text-muted-300">{t('parseDesc')}</p>
             </div>
           )}
+          {activeTab === 'convert' && (
+            <div className="text-center">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">{t('convert')} File</h3>
+              <p className="text-muted-600 dark:text-muted-300">{t('convertDesc')}</p>
+            </div>
+          )}
         </div>
 
         {state !== "loading" && state !== "toBeDownloaded" && state !== "error" && (
           <form onSubmit={onSubmit} className="space-y-8">
             {renderFileInput()}
-            {renderSettings()}
+        
+        {files.length > 0 && state === "selected" && activeTab === 'convert' && (
+          <div className="card mt-6">
+            <div className="space-y-4">
+              <label className="block text-sm font-medium text-gray-900 dark:text-white">
+                {t('convertTo')}
+              </label>
+              <select
+                value={convertFormat}
+                onChange={(e) => setConvertFormat(e.target.value)}
+                className="input"
+                disabled={supportedFormats.length === 0}
+              >
+                <option value="">选择格式</option>
+                {supportedFormats.map(format => (
+                  <option key={format.value} value={format.value}>{format.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+        
+        {renderSettings()}
 
-            {state === "selected" && (
-              <div className="text-center">
-                <button
-                  type="submit"
-                  className="btn-primary text-lg px-8 py-4 rounded-xl"
-                >
-                  {activeTab === 'compress' && t('compressPdf')}
-                  {activeTab === 'merge' && t('mergePdfs')}
-                  {activeTab === 'split' && t('splitPdf')}
-                  {activeTab === 'parse' && t('parsePdf')}
-                </button>
-              </div>
-            )}
+        {state === "selected" && (
+          <div className="text-center">
+            <button
+              type="submit"
+              className="btn-primary text-lg px-8 py-4 rounded-xl"
+              disabled={activeTab === 'convert' && !convertFormat}
+            >
+              {activeTab === 'compress' && t('compressPdf')}
+              {activeTab === 'merge' && t('mergePdfs')}
+              {activeTab === 'split' && t('splitPdf')}
+              {activeTab === 'parse' && t('parsePdf')}
+              {activeTab === 'convert' && t('convertFile')}
+            </button>
+          </div>
+        )}
           </form>
         )}
 
@@ -1038,26 +1903,94 @@ function App() {
 
         {state === "toBeDownloaded" && (
           <div className="space-y-6">
-            {downloadLinks.map((link, index) => (
-              <div key={index} className="text-center">
-                <a
-                  href={link.url}
-                  download={link.filename}
-                  className="btn-success text-lg px-8 py-4 inline-block rounded-xl"
-                >
-                  {t('download', { filename: link.filename })}
-                </a>
-              </div>
-            ))}
-
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white text-center">
+              {t('conversionComplete')}
+            </h3>
+            
+            {/* Action buttons at the top */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button onClick={processAgain} className="btn-secondary text-lg px-8 py-4 rounded-xl">
                 {t('processAgain')}
               </button>
-              <button onClick={resetForm} className="btn-primary text-lg px-8 py-4 rounded-xl">
+              <button onClick={() => {
+                resetForm();
+                // Trigger file selection dialog after a short delay to ensure form is reset
+                setTimeout(() => {
+                  document.getElementById('files').click();
+                }, 100);
+              }} className="btn-primary text-lg px-8 py-4 rounded-xl">
                 {t('chooseNewFiles')}
               </button>
             </div>
+            
+            {/* File previews below */}
+            {downloadLinks.map((link, index) => (
+              <div key={index} className="card">
+                <div className="flex flex-col md:flex-row gap-6 items-center">
+                  {/* Preview Section */}
+                  <div className="flex-1">
+                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                      {link.filename}
+                      {link.page && link.totalPages && link.totalPages > 1 && (
+                        <span className="text-sm text-muted-600 dark:text-muted-400 ml-2">
+                          (Page {link.page} of {link.totalPages})
+                        </span>
+                      )}
+                    </h4>
+                    
+                    {/* Preview for converted files */}
+                    {link.operation === 'convert' && link.url && (
+                      <div className="border border-muted-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-900">
+                        {link.filename.match(/\.(jpg|jpeg|png|bmp)$/i) ? (
+                          <img 
+                            src={link.url} 
+                            alt={link.filename}
+                            className="w-full h-auto max-h-64 object-contain"
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              e.target.nextSibling.style.display = 'block';
+                            }}
+                          />
+                        ) : link.filename.endsWith('.pdf') ? (
+                          <PdfPreview url={link.url} />
+                        ) : null}
+                        
+                        {/* Fallback for failed preview */}
+                        <div className="hidden p-8 text-center">
+                          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+                            <span className="text-2xl font-bold text-gray-600 dark:text-gray-400">📄</span>
+                          </div>
+                          <p className="text-muted-600 dark:text-muted-400">
+                            Preview not available
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Download Section */}
+                  <div className="flex flex-col gap-3">
+                    <a
+                      href={link.url}
+                      download={link.filename}
+                      className="btn-success text-lg px-6 py-3 rounded-xl text-center"
+                    >
+                      {t('download', { filename: link.filename })}
+                    </a>
+                    
+                    {/* Preview button for images */}
+                    {link.filename.match(/\.(jpg|jpeg|png|bmp)$/i) && (
+                      <button
+                        onClick={() => window.open(link.url, '_blank')}
+                        className="btn-secondary text-lg px-6 py-3 rounded-xl"
+                      >
+                        {t('preview')}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -1084,6 +2017,10 @@ function App() {
             <li className="flex items-start gap-2">
               <span className="text-primary-600 dark:text-primary-400 font-bold">•</span>
               <span><strong className="text-gray-900 dark:text-white">Progress Bar:</strong> {t('progressBarFeature')}</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary-600 dark:text-primary-400 font-bold">•</span>
+              <span><strong className="text-gray-900 dark:text-white">{t('convert')}:</strong> {t('convertFeature')}</span>
             </li>
           </ul>
 
