@@ -463,7 +463,18 @@ function App() {
         return;
       }
 
-      const { pdfURL, size: newSize } = await loadPDFData(result.pdfDataURL, filename);
+      // Prefer ArrayBuffer from worker to create blob URL in main thread
+      let pdfURL;
+      let newSize = 0;
+      if (result.pdfArrayBuffer) {
+        const blob = new Blob([result.pdfArrayBuffer], { type: 'application/pdf' });
+        pdfURL = URL.createObjectURL(blob);
+        newSize = blob.size;
+      } else {
+        const loaded = await loadPDFData(result.pdfDataURL, filename);
+        pdfURL = loaded.pdfURL;
+        newSize = loaded.size;
+      }
 
       setDownloadLinks([{
         url: pdfURL,

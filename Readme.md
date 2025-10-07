@@ -53,7 +53,7 @@ npm run preview
 ### Merge PDF
 - [x] Combine multiple PDF files into one
 - [x] Quality settings for output optimization
-- [ ] Drag-and-drop interface for file selection
+- [x] Drag-and-drop interface for file selection
 
 ### Compress PDF
 - [x] Multiple quality presets (Screen, eBook, Printer, Prepress, Default)
