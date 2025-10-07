@@ -830,6 +830,11 @@ function App() {
     activeTab === 'convert' && files.length > 1 && files.every(item => isImageFile(item.file))
   );
 
+  // Check if file reordering is enabled (for both merge and convert modes)
+  const isFileReorderEnabled = () => (
+    (activeTab === 'merge' && files.length > 1) || isImageReorderMode()
+  );
+
   async function convertFile(inputFiles, filename) {
     setState("loading");
     setTerminalData(""); // Clear previous terminal data
@@ -1131,7 +1136,7 @@ function App() {
   };
 
   const handleDragStart = (index) => (event) => {
-    if (!isImageReorderMode()) return;
+    if (!isFileReorderEnabled()) return;
     dragSourceIndexRef.current = index;
     setDraggingIndex(index);
     setDragOverIndex(index);
@@ -1146,7 +1151,7 @@ function App() {
   };
 
   const handleDragEnter = (index) => (event) => {
-    if (!isImageReorderMode() || dragSourceIndexRef.current === null) return;
+    if (!isFileReorderEnabled() || dragSourceIndexRef.current === null) return;
     event.preventDefault();
     if (index !== dragOverIndex) {
       setDragOverIndex(index);
@@ -1154,7 +1159,7 @@ function App() {
   };
 
   const handleDragOver = (event) => {
-    if (!isImageReorderMode() || dragSourceIndexRef.current === null) return;
+    if (!isFileReorderEnabled() || dragSourceIndexRef.current === null) return;
     event.preventDefault();
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = 'move';
@@ -1162,7 +1167,7 @@ function App() {
   };
 
   const handleDrop = (index) => (event) => {
-    if (!isImageReorderMode() || dragSourceIndexRef.current === null) return;
+    if (!isFileReorderEnabled() || dragSourceIndexRef.current === null) return;
     event.preventDefault();
     const sourceIndex = dragSourceIndexRef.current;
     if (sourceIndex === index) {
@@ -1356,7 +1361,7 @@ function App() {
 
             <div className="space-y-3">
               {files.map((file, index) => {
-                const reorderEnabled = isImageReorderMode();
+                const reorderEnabled = isFileReorderEnabled();
                 const isDraggingItem = draggingIndex === index;
                 const isDropTarget = dragOverIndex === index && draggingIndex !== null && draggingIndex !== index;
                 const baseClasses = "flex items-center justify-between p-4 bg-muted-50 dark:bg-gray-700 border border-muted-200 dark:border-gray-600 rounded-xl transition-all duration-150";
@@ -1399,7 +1404,7 @@ function App() {
                 );
               })}
 
-              {isImageReorderMode() && (
+              {isFileReorderEnabled() && (
                 <p className="text-xs text-muted-600 dark:text-muted-400 text-center">
                   {t('dragToReorder')}
                 </p>

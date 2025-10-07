@@ -65,3 +65,6 @@ App.jsx:311
 # bugFix
 图片转换为pdf后，pdf预览解决有问题，pdf没有显示在预览框内，帮我解决
 图片转换为pdf后，预览界面显示 Loading PDF preview...时间很长，帮我优化pdf预览。
+
+# dev 1.0.3
+1. 文件合并时，可以拖拽文件的顺序；
