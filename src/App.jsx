@@ -116,6 +116,9 @@ function App() {
   // PDF to image page selection state
   const [selectedPages, setSelectedPages] = useState("");
   const [pdfPageCount, setPdfPageCount] = useState(0);
+  const [draggingIndex, setDraggingIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const dragSourceIndexRef = useRef(null);
 
   // PDF Preview component for converted PDFs
   const PdfPreview = ({ url }) => {
@@ -861,6 +864,51 @@ function App() {
     return Array.from(pages).sort((a, b) => a - b);
   }
 
+  const isPdfFile = (file) => {
+    if (!file) return false;
+    const name = file.name?.toLowerCase() || '';
+    return file.type === 'application/pdf' || name.endsWith('.pdf');
+  };
+
+  const isImageFile = (file) => {
+    if (!file) return false;
+    if (file.type?.startsWith('image/')) return true;
+    return /\.(jpg|jpeg|png|bmp)$/i.test(file.name || '');
+  };
+
+  const loadPdfPageCount = async (file) => {
+    try {
+      if (!file) {
+        setPdfPageCount(0);
+        return;
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
+      } catch (e) {
+        // Ignore worker configuration errors here
+      }
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
+      setPdfPageCount(pdf.numPages || 0);
+    } catch (error) {
+      console.error('Failed to load PDF metadata:', error);
+      setPdfPageCount(0);
+    }
+  };
+
+  const reorderFiles = (list, startIndex, endIndex) => {
+    const updated = [...list];
+    const [removed] = updated.splice(startIndex, 1);
+    updated.splice(endIndex, 0, removed);
+    return updated;
+  };
+
+  const isImageReorderMode = () => (
+    activeTab === 'convert' && files.length > 1 && files.every(item => isImageFile(item.file))
+  );
+
   async function convertFile(inputFiles, filename) {
     setState("loading");
     setTerminalData(""); // Clear previous terminal data
@@ -869,9 +917,9 @@ function App() {
     try {
       const file = inputFiles[0].file;
       const fileType = file.type;
-      
+
       // For PDF to image conversion
-      if (fileType === 'application/pdf' && ['jpg', 'jpeg', 'png', 'bmp'].includes(convertFormat)) {
+      if (isPdfFile(file) && ['jpg', 'jpeg', 'png', 'bmp'].includes(convertFormat)) {
         // Configure worker for pdfjs
         try {
           pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
@@ -889,12 +937,15 @@ function App() {
         
         // Parse user selected pages or use all pages
         const pagesToConvert = parsePageSelection(selectedPages, numPages);
+        if (pagesToConvert.length === 0) {
+          throw new Error(t('invalidPageSelection'));
+        }
         setProgressInfo({ current: 0, total: pagesToConvert.length, currentPage: 0 });
 
         // Convert selected pages to images
         const downloadLinks = [];
         
-        for (const pageNum of pagesToConvert) {
+        for (const [index, pageNum] of pagesToConvert.entries()) {
           const page = await pdf.getPage(pageNum);
           const viewport = page.getViewport({ scale: 2.0 });
           
@@ -940,31 +991,15 @@ function App() {
           });
           
           // Update progress
-          setProgressInfo({ current: pageNum, total: numPages, currentPage: pageNum });
+          setProgressInfo({ current: index + 1, total: pagesToConvert.length, currentPage: pageNum });
         }
         
         setDownloadLinks(downloadLinks);
       }
       // For image to PDF conversion - support multiple images
-      else if (fileType.startsWith('image/') && convertFormat === 'pdf') {
-        let pdfArrayBuffer;
-        
-        // Check if multiple images are selected
-        if (inputFiles.length > 1) {
-          // Create PDF with multiple images
-          pdfArrayBuffer = await createPdfWithMultipleImages(inputFiles);
-        } else {
-          // Read single image file
-          const reader = new FileReader();
-          const imageDataUrl = await new Promise((resolve) => {
-            reader.onload = (e) => resolve(e.target.result);
-            reader.readAsDataURL(file);
-          });
-          
-          // Create PDF using jsPDF library
-          pdfArrayBuffer = await createSimplePdfWithImage(imageDataUrl);
-        }
-        
+      else if (isImageFile(file) && convertFormat === 'pdf') {
+        const pdfArrayBuffer = await createPdfWithMultipleImages(inputFiles);
+
         // Convert the ArrayBuffer to a Blob
         const pdfBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
         
@@ -1017,193 +1052,248 @@ function App() {
 
   // Helper function to create a PDF with multiple images
   async function createPdfWithMultipleImages(inputFiles) {
+    if (!inputFiles || inputFiles.length === 0) {
+      throw new Error('No images supplied for PDF generation');
+    }
+
     try {
-      // Dynamically import jsPDF to avoid bundling it unnecessarily
       const { jsPDF } = await import('jspdf');
-      
-      // Create a new jsPDF instance
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-      
-      // PDF page dimensions
-      const pdfWidth = doc.internal.pageSize.getWidth();
-      const pdfHeight = doc.internal.pageSize.getHeight();
-      
-      // Process each image and add to PDF
+
+      const imageEntries = [];
+
+      // Preload all images to gather dimensions
       for (let i = 0; i < inputFiles.length; i++) {
         const file = inputFiles[i].file;
-        
-        // Read image file as Data URL
-        const imageDataUrl = await new Promise((resolve) => {
+        const dataUrl = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = reject;
           reader.readAsDataURL(file);
         });
-        
-        // Create image element to get dimensions
-        const img = new Image();
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
+
+        const dimensions = await new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve({ width: img.width, height: img.height });
           img.onerror = reject;
-          img.src = imageDataUrl;
+          img.src = dataUrl;
         });
-        
-        // Get image dimensions
-        const imgWidth = img.width;
-        const imgHeight = img.height;
-        
-        // Calculate scaling to fit image in PDF while maintaining aspect ratio
-        const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-        const width = imgWidth * ratio;
-        const height = imgHeight * ratio;
-        
-        // Center the image on the page
-        const x = (pdfWidth - width) / 2;
-        const y = (pdfHeight - height) / 2;
-        
-        // Add a new page for all images except the first one
-        if (i > 0) {
-          doc.addPage();
-        }
-        
-        // Add image to PDF
-        doc.addImage(imageDataUrl, 'JPEG', x, y, width, height);
-        
-        // Update progress
-        setProgressInfo({ current: i + 1, total: inputFiles.length, currentPage: 0 });
+
+        imageEntries.push({
+          file,
+          dataUrl,
+          width: dimensions.width,
+          height: dimensions.height
+        });
       }
-      
-      // Return the PDF as array buffer
-      const pdfData = doc.output('arraybuffer');
-      return pdfData;
+
+      const maxWidth = Math.max(...imageEntries.map((img) => img.width), 1);
+      const maxHeight = Math.max(...imageEntries.map((img) => img.height), 1);
+
+      const orientation = maxWidth >= maxHeight ? 'landscape' : 'portrait';
+      const doc = new jsPDF({
+        orientation,
+        unit: 'px',
+        format: [maxWidth, maxHeight]
+      });
+
+      setProgressInfo({ current: 0, total: imageEntries.length, currentPage: 0 });
+
+      for (let i = 0; i < imageEntries.length; i++) {
+        const { file, dataUrl, width, height } = imageEntries[i];
+
+        if (i > 0) {
+          doc.addPage([maxWidth, maxHeight], orientation);
+        }
+
+        const scale = Math.min(maxWidth / width, maxHeight / height);
+        const scaledWidth = width * scale;
+        const scaledHeight = height * scale;
+        const offsetX = (maxWidth - scaledWidth) / 2;
+        const offsetY = (maxHeight - scaledHeight) / 2;
+
+        const imageFormat = file.type.includes('png') ? 'PNG' : 'JPEG';
+
+        doc.addImage(dataUrl, imageFormat, offsetX, offsetY, scaledWidth, scaledHeight, undefined, 'FAST');
+
+        setProgressInfo({ current: i + 1, total: imageEntries.length, currentPage: 0 });
+      }
+
+      return doc.output('arraybuffer');
     } catch (error) {
       console.error('Error creating PDF from multiple images:', error);
       throw error;
     }
   }
-  
-  // Helper function to create a simple PDF with an image
-  // This is a simplified version for demonstration
-  async function createSimplePdfWithImage(imageDataUrl) {
-    try {
-      // Dynamically import jsPDF to avoid bundling it unnecessarily
-      const { jsPDF } = await import('jspdf');
-      
-      // Create a new jsPDF instance
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-      
-      // Create an image element to get dimensions
-      const img = new Image();
-      const loadImage = new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = imageDataUrl;
-      });
-      
-      await loadImage;
-      
-      // Get image dimensions
-      const imgWidth = img.width;
-      const imgHeight = img.height;
-      
-      // Calculate dimensions to fit in PDF (A4 size in mm)
-      const pdfWidth = doc.internal.pageSize.getWidth();
-      const pdfHeight = doc.internal.pageSize.getHeight();
-      
-      // Calculate scaling to fit image in PDF while maintaining aspect ratio
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      const width = imgWidth * ratio;
-      const height = imgHeight * ratio;
-      
-      // Center the image on the page
-      const x = (pdfWidth - width) / 2;
-      const y = (pdfHeight - height) / 2;
-      
-      // Add image to PDF
-      doc.addImage(imageDataUrl, 'JPEG', x, y, width, height);
-      
-      // Return the PDF as array buffer
-      const pdfData = doc.output('arraybuffer');
-      return pdfData;
-    } catch (error) {
-      console.error('Error creating PDF from image:', error);
-      throw error;
-    }
-  }
 
-  const changeHandler = (event) => {
+  const changeHandler = async (event) => {
     const selectedFiles = Array.from(event.target.files);
-    const fileObjects = selectedFiles.map(file => ({
-      filename: file.name,
-      url: window.URL.createObjectURL(file),
-      file: file
-    }));
-
-    // For compress and split operations, replace existing files (single file only)
-    // For merge and image to PDF conversion, allow multiple files
-    if (activeTab === 'merge' || (activeTab === 'convert' && fileObjects.length > 0 && fileObjects[0].file.type.startsWith('image/'))) {
-      setFiles(prevFiles => [...prevFiles, ...fileObjects]);
-    } else {
-      // Clean up previous files for compress/split
-      files.forEach(file => {
-        window.URL.revokeObjectURL(file.url);
-      });
-      setFiles(fileObjects.slice(0, 1)); // Only take the first file for compress/split
+    if (selectedFiles.length === 0) {
+      return;
     }
-    
-    // Update supported formats for convert feature
-    if (activeTab === 'convert' && selectedFiles.length > 0) {
-      const file = selectedFiles[0];
-      const fileType = file.type.toLowerCase();
-      const fileName = file.name.toLowerCase();
-      
-      let formats = [];
-      
-      // Check if file is PDF
-      if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
-        formats = [
+
+    if (activeTab === 'convert') {
+      const containsPdf = selectedFiles.some(isPdfFile);
+      const containsImage = selectedFiles.some(isImageFile);
+
+      if (containsPdf && containsImage) {
+        alert(t('mixedConvertTypesNotSupported'));
+        return;
+      }
+
+      if (containsPdf) {
+        const pdfFile = selectedFiles.find(isPdfFile);
+        if (!pdfFile) {
+          return;
+        }
+
+        // Clean up existing object URLs
+        files.forEach(file => {
+          window.URL.revokeObjectURL(file.url);
+        });
+
+        const pdfObject = {
+          filename: pdfFile.name,
+          url: window.URL.createObjectURL(pdfFile),
+          file: pdfFile
+        };
+
+        setFiles([pdfObject]);
+        setSupportedFormats([
           { value: 'jpg', label: 'JPG' },
           { value: 'png', label: 'PNG' },
           { value: 'jpeg', label: 'JPEG' },
           { value: 'bmp', label: 'BMP' }
-        ];
-      } 
-      // Check if file is an image
-      else if (fileType.startsWith('image/') || 
-               fileName.endsWith('.jpg') || 
-               fileName.endsWith('.jpeg') || 
-               fileName.endsWith('.png') || 
-               fileName.endsWith('.bmp')) {
-        formats = [
-          { value: 'pdf', label: 'PDF' }
-        ];
+        ]);
+        setConvertFormat((prev) => ['jpg', 'png', 'jpeg', 'bmp'].includes(prev) ? prev : 'jpg');
+        setSelectedPages('');
+        setPdfPageCount(0);
+        await loadPdfPageCount(pdfFile);
+      } else if (containsImage) {
+        const imageFiles = selectedFiles.filter(isImageFile);
+        if (imageFiles.length === 0) {
+          return;
+        }
+
+        const imageObjects = imageFiles.map(file => ({
+          filename: file.name,
+          url: window.URL.createObjectURL(file),
+          file
+        }));
+
+        setFiles(prevFiles => {
+          const existingImages = prevFiles.filter(item => {
+            const keep = isImageFile(item.file);
+            if (!keep) {
+              window.URL.revokeObjectURL(item.url);
+            }
+            return keep;
+          });
+          return [...existingImages, ...imageObjects];
+        });
+        setSupportedFormats([{ value: 'pdf', label: 'PDF' }]);
+        if (convertFormat !== 'pdf') {
+          setConvertFormat('pdf');
+        }
+        setPdfPageCount(0);
+        setSelectedPages('');
+      } else {
+        alert(t('unsupportedConvertType'));
+        return;
       }
-      
-      setSupportedFormats(formats);
-      setConvertFormat(formats.length > 0 ? formats[0].value : '');
+
+      setDownloadLinks([]);
+      setPdfUrl(null);
+      setFileInfo(null);
+      setDraggingIndex(null);
+      setDragOverIndex(null);
+      dragSourceIndexRef.current = null;
+    } else {
+      const fileObjects = selectedFiles.map(file => ({
+        filename: file.name,
+        url: window.URL.createObjectURL(file),
+        file
+      }));
+
+      if (activeTab === 'merge') {
+        setFiles(prevFiles => [...prevFiles, ...fileObjects]);
+      } else {
+        files.forEach(file => {
+          window.URL.revokeObjectURL(file.url);
+        });
+        setFiles(fileObjects.slice(0, 1));
+      }
     }
-    
-    setState("selected");
+
+    setState('selected');
+  };
+
+  const handleDragStart = (index) => (event) => {
+    if (!isImageReorderMode()) return;
+    dragSourceIndexRef.current = index;
+    setDraggingIndex(index);
+    setDragOverIndex(index);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      try {
+        event.dataTransfer.setData('text/plain', String(index));
+      } catch (e) {
+        // Some browsers might block setting data; ignore
+      }
+    }
+  };
+
+  const handleDragEnter = (index) => (event) => {
+    if (!isImageReorderMode() || dragSourceIndexRef.current === null) return;
+    event.preventDefault();
+    if (index !== dragOverIndex) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDragOver = (event) => {
+    if (!isImageReorderMode() || dragSourceIndexRef.current === null) return;
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move';
+    }
+  };
+
+  const handleDrop = (index) => (event) => {
+    if (!isImageReorderMode() || dragSourceIndexRef.current === null) return;
+    event.preventDefault();
+    const sourceIndex = dragSourceIndexRef.current;
+    if (sourceIndex === index) {
+      handleDragEnd();
+      return;
+    }
+    setFiles(prevFiles => reorderFiles(prevFiles, sourceIndex, index));
+    handleDragEnd();
+  };
+
+  const handleDragEnd = () => {
+    dragSourceIndexRef.current = null;
+    setDraggingIndex(null);
+    setDragOverIndex(null);
   };
 
   const removeFile = (indexToRemove) => {
-    setFiles(prevFiles => {
-      const newFiles = prevFiles.filter((_, index) => index !== indexToRemove);
-      // Clean up blob URL
-      window.URL.revokeObjectURL(prevFiles[indexToRemove].url);
-      return newFiles;
-    });
+    const fileToRemove = files[indexToRemove];
+    if (fileToRemove) {
+      window.URL.revokeObjectURL(fileToRemove.url);
+    }
 
-    // Update state if no files left
-    if (files.length === 1) {
-      setState("init");
+    const updatedFiles = files.filter((_, index) => index !== indexToRemove);
+    setFiles(updatedFiles);
+
+    if (updatedFiles.length === 0) {
+      setState('init');
+      setSupportedFormats([]);
+      setConvertFormat('');
+      setSelectedPages('');
+      setPdfPageCount(0);
+      setDraggingIndex(null);
+      setDragOverIndex(null);
+      dragSourceIndexRef.current = null;
     }
   };
 
@@ -1214,6 +1304,13 @@ function App() {
     });
     setFiles([]);
     setState("init");
+    setSupportedFormats([]);
+    setConvertFormat('');
+    setSelectedPages('');
+    setPdfPageCount(0);
+    setDraggingIndex(null);
+    setDragOverIndex(null);
+    dragSourceIndexRef.current = null;
   };
 
   const addMoreFiles = () => {
@@ -1287,6 +1384,13 @@ function App() {
     // Reset convert feature state
     setConvertFormat("");
     setSupportedFormats([]);
+    setSelectedPages('');
+    setPdfPageCount(0);
+    setPdfUrl(null);
+    setFileInfo(null);
+    setDraggingIndex(null);
+    setDragOverIndex(null);
+    dragSourceIndexRef.current = null;
   };
 
   const processAgain = () => {
@@ -1302,8 +1406,8 @@ function App() {
   };
 
   const renderFileInput = () => {
-    const accept = activeTab === 'convert' ? "application/pdf,image/*,.jpg,.jpeg,.png,.bmp" : "application/pdf";
-    const multiple = activeTab === 'merge';
+  const accept = activeTab === 'convert' ? "application/pdf,image/*,.jpg,.jpeg,.png,.bmp" : "application/pdf";
+  const multiple = activeTab === 'merge' || activeTab === 'convert';
 
     return (
       <div className="space-y-6">
@@ -1348,25 +1452,57 @@ function App() {
             </div>
 
             <div className="space-y-3">
-              {files.map((file, index) => (
-                <div key={index} className="flex items-center justify-between p-4 bg-muted-50 dark:bg-gray-700 border border-muted-200 dark:border-gray-600 rounded-xl">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                      {file.filename}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    className="ml-4 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-sm font-bold transition-all duration-200 hover:scale-110"
-                    onClick={() => removeFile(index)}
-                    title={t('removeFile')}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
+              {files.map((file, index) => {
+                const reorderEnabled = isImageReorderMode();
+                const isDraggingItem = draggingIndex === index;
+                const isDropTarget = dragOverIndex === index && draggingIndex !== null && draggingIndex !== index;
+                const baseClasses = "flex items-center justify-between p-4 bg-muted-50 dark:bg-gray-700 border border-muted-200 dark:border-gray-600 rounded-xl transition-all duration-150";
+                const dragClasses = reorderEnabled ? " cursor-grab active:cursor-grabbing" : "";
+                const highlightClasses = [
+                  isDraggingItem ? "opacity-75 ring-2 ring-primary-400" : "",
+                  isDropTarget ? "ring-2 ring-primary-500 bg-primary-50/60 dark:bg-primary-900/20" : ""
+                ].join(' ');
 
-              {activeTab === 'merge' && (
+                return (
+                  <div
+                    key={index}
+                    className={`${baseClasses}${dragClasses} ${highlightClasses}`.trim()}
+                    draggable={reorderEnabled}
+                    onDragStart={handleDragStart(index)}
+                    onDragEnter={handleDragEnter(index)}
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop(index)}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {reorderEnabled && (
+                          <span className="mr-2 text-xs font-semibold text-muted-500 dark:text-muted-300 select-none">
+                            {index + 1}.
+                          </span>
+                        )}
+                        {file.filename}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="ml-4 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-sm font-bold transition-all duration-200 hover:scale-110"
+                      onClick={() => removeFile(index)}
+                      title={t('removeFile')}
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })}
+
+              {isImageReorderMode() && (
+                <p className="text-xs text-muted-600 dark:text-muted-400 text-center">
+                  {t('dragToReorder')}
+                </p>
+              )}
+
+              {(activeTab === 'merge' || (activeTab === 'convert' && isImageReorderMode())) && (
                 <button
                   type="button"
                   className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-muted-300 dark:border-gray-600 rounded-xl text-muted-600 dark:text-muted-400 hover:border-muted-400 dark:hover:border-gray-500 hover:text-muted-700 dark:hover:text-muted-300 transition-colors"
@@ -1491,10 +1627,10 @@ function App() {
             </div>
 
             {/* Page Selection for PDF to Image Conversion */}
-            {activeTab === 'convert' && convertFormat && ['jpg', 'jpeg', 'png', 'bmp'].includes(convertFormat) && pdfPageCount > 0 && (
+            {activeTab === 'convert' && convertFormat && ['jpg', 'jpeg', 'png', 'bmp'].includes(convertFormat) && files.length > 0 && isPdfFile(files[0]?.file) && (
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-gray-900 dark:text-white">
-                  {t('selectPages')} (1-{pdfPageCount})
+                  {pdfPageCount > 0 ? `${t('selectPages')} (1-${pdfPageCount})` : t('pageSelectionLoading')}
                 </label>
                 <input
                   type="text"
@@ -1502,6 +1638,7 @@ function App() {
                   value={selectedPages}
                   onChange={(e) => setSelectedPages(e.target.value)}
                   className="input"
+                  disabled={pdfPageCount === 0}
                 />
                 <p className="text-xs text-muted-600 dark:text-muted-400">
                   {t('pageSelectionHelp')}

@@ -65,6 +65,11 @@ npm run preview
 ### Advanced Parse PDF
 - [ ] Use OCR to extract images, metadata, and other structured information
 
+### File Conversion
+- [x] Convert PDF to JPG, PNG, JPEG, BMP
+- [x] Convert JPG, PNG, JPEG, BMP to PDF
+- [x] Support merging multiple images into a PDF, with drag-and-drop to adjust image order
+
 ### Dark Mode
 - [x] Toggle between light and dark themes
 - [x] Respects system preference on first visit

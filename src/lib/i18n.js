@@ -104,7 +104,15 @@ const resources = {
       // Convert feature
       "selectFileToConvert": "Select a file to convert",
       "convertTo": "Convert to:",
+  "selectPages": "Select pages",
+  "pageSelectionHint": "Example: 1,3-5,10",
+  "pageSelectionHelp": "Use commas to separate pages or ranges, e.g. 1,3-5",
+  "pageSelectionLoading": "Loading page list...",
       "progressBarFeature": "Visual progress tracking with page-by-page processing status",
+  "dragToReorder": "Drag files to adjust their order",
+  "invalidPageSelection": "Please enter page numbers that exist in the document.",
+  "mixedConvertTypesNotSupported": "Please select either a PDF or image files, not both at the same time.",
+  "unsupportedConvertType": "Unsupported file type selected for conversion.",
       
       // Privacy section
       "privacySecurity": "Privacy & Security:",
@@ -223,7 +231,15 @@ const resources = {
       // Convert feature
       "selectFileToConvert": "选择要转换的文件",
       "convertTo": "转换为：",
+  "selectPages": "选择页码",
+  "pageSelectionHint": "例如：1,3-5,10",
+  "pageSelectionHelp": "使用逗号分隔页面或区间，例如 1,3-5",
+  "pageSelectionLoading": "正在读取页码...",
       "progressBarFeature": "带有逐页处理状态的可视化进度跟踪",
+  "dragToReorder": "拖动文件可调整顺序",
+  "invalidPageSelection": "请输入文档范围内的有效页码。",
+  "mixedConvertTypesNotSupported": "请选择单个 PDF 或一组图片，不能同时选择两种类型。",
+  "unsupportedConvertType": "包含不支持转换的文件类型。",
       
       // Privacy section
       "privacySecurity": "隐私与安全：",

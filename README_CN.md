@@ -66,6 +66,12 @@ npm run preview
 ### 高级解析PDF
 - [ ] 使用OCR对PDF中的图像、元数据和其他结构化信息进行提取
 
+### 文件转换
+- [x] 将PDF转换为JPG、PNG、JPEG、BMP
+- [x] 将JPG、PNG、JPEG、BMP转换为PDF
+- [x] 支持将多张图片合并转为PDF，支持拖拉图片调整顺序
+
+
 ### 暗黑模式
 - [x] 在亮色和暗色主题之间切换
 - [x] 首次访问时尊重系统偏好
