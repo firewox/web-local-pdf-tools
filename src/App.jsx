@@ -127,8 +127,18 @@ function App() {
     const [totalPages, setTotalPages] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [renderReady, setRenderReady] = useState(false);
     const canvasRef = useRef(null);
     const previewContainerRef = useRef(null);
+    const mountedRef = useRef(true);
+
+    // Cleanup on unmount
+    useEffect(() => {
+      mountedRef.current = true;
+      return () => {
+        mountedRef.current = false;
+      };
+    }, []);
 
     useEffect(() => {
       if (!url) {
@@ -138,46 +148,55 @@ function App() {
 
       const loadPdf = async () => {
         try {
+          if (!mountedRef.current) return;
+          
           setLoading(true);
           setError(null);
+          setRenderReady(false);
           
-          // Configure worker for pdfjs
+          // Configure worker for pdfjs - simplified approach
           try {
-            // Try multiple worker sources for compatibility
-            if (typeof window !== 'undefined' && window.pdfjsLib) {
-              // First try the standard worker
+            if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
               try {
                 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
               } catch (e) {
-                // Fallback to CDN worker
                 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
               }
             }
           } catch (e) {
-            console.warn('Failed to configure PDF.js worker:', e);
+            console.warn('Worker configuration skipped:', e);
           }
 
-          // Load the PDF document with optimized options for better performance
+          // Load the PDF document with optimized options
           const loadingTask = pdfjsLib.getDocument({
             url: url,
-            cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/' + pdfjsLib.version + '/cmaps/',
-            cMapPacked: true,
-            disableAutoFetch: false, // Enable auto-fetch for better streaming
-            disableStream: false,    // Enable streaming for faster initial load
-            enableXfa: false,        // Disable XFA forms for better performance
-            ignoreErrors: true,      // Ignore non-critical errors
-            useSystemFonts: false    // Use embedded fonts to ensure rendering consistency
+            disableAutoFetch: true,  // Faster initial load
+            disableStream: true,     // Better for small PDFs
+            enableXfa: false,
+            ignoreErrors: true
           });
           
           const pdf = await loadingTask.promise;
+          
+          if (!mountedRef.current) return;
+          
           setPdfDoc(pdf);
           setTotalPages(pdf.numPages);
           setCurrentPage(1);
           setLoading(false);
+          
+          // Signal that we're ready to render
+          setTimeout(() => {
+            if (mountedRef.current) {
+              setRenderReady(true);
+            }
+          }, 100);
         } catch (error) {
           console.error('Error loading PDF for preview:', error);
-          setError(error.message || 'Failed to load PDF');
-          setLoading(false);
+          if (mountedRef.current) {
+            setError(error.message || 'Failed to load PDF');
+            setLoading(false);
+          }
         }
       };
 
@@ -185,257 +204,149 @@ function App() {
     }, [url]);
 
     useEffect(() => {
-      if (!pdfDoc) return;
+      if (!pdfDoc || !renderReady) return;
 
       const renderPage = async () => {
         try {
-          // Function to wait for an element to be available with improved reliability
-          const waitForElement = async (elementRef, maxWaitTime = 3000, checkInterval = 150) => {
-            return new Promise((resolve) => {
-              let checks = 0;
-              const maxChecks = maxWaitTime / checkInterval;
-              const interval = setInterval(() => {
-                if (elementRef.current && document.contains(elementRef.current)) {
-                  clearInterval(interval);
-                  resolve(true);
-                } else if (checks >= maxChecks) {
-                  clearInterval(interval);
-                  resolve(false);
-                }
-                checks++;
-              }, checkInterval);
-            });
-          };
-
-          setLoading(true);
-          setError(null); // Clear any previous errors
-
-          // First, ensure the PDF document is loaded
-          if (!pdfDoc) {
-            throw new Error('PDF document not loaded');
-          }
-
-          // Function to create and attach a temporary canvas to DOM as a last resort
-          const createTemporaryCanvas = () => {
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.id = 'temporary-pdf-canvas';
-            tempCanvas.className = 'w-full h-auto max-h-96 object-contain';
-            
-            // Try to find an appropriate container in the DOM
-            let containerElement = previewContainerRef.current || 
-                                  document.querySelector('.border.rounded-xl.overflow-hidden') ||
-                                  document.querySelector('.p-4.space-y-4') ||
-                                  document.body;
-            
-            if (containerElement) {
-              containerElement.appendChild(tempCanvas);
-              // Store reference to the temporary canvas so we can remove it later
-              if (!window.tempPdfCanvas) {
-                window.tempPdfCanvas = [];
-              }
-              window.tempPdfCanvas.push(tempCanvas);
-            }
-            
-            return tempCanvas;
-          };
-
-          // Enhanced canvas lookup with multiple strategies
-          const findOrCreateCanvas = () => {
-            // Strategy 1: Use the ref directly
-            if (canvasRef.current && document.contains(canvasRef.current)) {
-              return canvasRef.current;
-            }
-            
-            // Strategy 2: Try to find any canvas in the DOM
-            let canvas = document.querySelector('canvas');
-            if (canvas) {
-              return canvas;
-            }
-            
-            // Strategy 3: Try to find canvas with specific attributes
-            canvas = document.querySelector('[ref="canvasRef"]');
-            if (canvas) {
-              return canvas;
-            }
-            
-            // Strategy 4: Create a temporary canvas and attach it to DOM
-            console.warn('Creating temporary canvas element as last resort');
-            return createTemporaryCanvas();
-          };
-
-          // Wait for both canvas and container elements to be available and attached to DOM
-          const canvasAvailable = await waitForElement(canvasRef, 3000);
-          const containerAvailable = await waitForElement(previewContainerRef, 3000);
-
-          // Find or create canvas element with enhanced logic
-          let canvas = findOrCreateCanvas();
+          if (!mountedRef.current) return;
           
-          // If canvas is still not found, create a new one
+          setLoading(true);
+          setError(null);
+
+          // Wait a bit for the DOM to be ready
+          await new Promise(resolve => setTimeout(resolve, 50));
+          
+          if (!mountedRef.current) return;
+
+          // Get the canvas element
+          const canvas = canvasRef.current;
           if (!canvas) {
-            canvas = createTemporaryCanvas();
+            console.warn('Canvas ref not available yet');
+            return;
           }
 
-          // Ensure we have a valid canvas before proceeding
-          if (!canvas) {
-            throw new Error('Failed to find or create a valid canvas element');
-          }
-
-          // For cases where canvasRef is still null but we have a canvas, use that canvas
-          let canvasToUse = canvasRef.current || canvas;
-
-          // Ensure the canvas is attached to DOM
-          if (!document.contains(canvasToUse)) {
-            // Try to attach it if it's not already attached
-            const containerElement = previewContainerRef.current || document.body;
-            if (containerElement && !containerElement.contains(canvasToUse)) {
-              try {
-                containerElement.appendChild(canvasToUse);
-              } catch (e) {
-                console.warn('Failed to attach canvas to DOM, proceeding anyway:', e);
-              }
-            }
+          // Ensure canvas is in DOM
+          if (!document.contains(canvas)) {
+            console.warn('Canvas not in DOM yet');
+            return;
           }
 
           const page = await pdfDoc.getPage(currentPage);
           const viewportBase = page.getViewport({ scale: 1 });
           
-          // More robust clientWidth access with fallback calculations
-          let containerWidth = viewportBase.width;
+          // Calculate container width with fallback
+          let containerWidth = 600; // Default width
           if (previewContainerRef.current) {
-            containerWidth = previewContainerRef.current.clientWidth || 
-                            previewContainerRef.current.offsetWidth || 
-                            window.innerWidth * 0.8 || 
-                            viewportBase.width;
-          } else {
-            // Fallback when container ref is not available
-            containerWidth = window.innerWidth * 0.8 || viewportBase.width;
-          }
-          
-          // Calculate optimal scale with upper and lower bounds
-          const scale = Math.max(0.5, Math.min(containerWidth / viewportBase.width, 2.0));
-          const viewport = page.getViewport({ scale });
-
-          // Enhanced canvas validation
-          if (!canvasToUse) {
-            throw new Error('Canvas element reference is null after all attempts');
-          }
-          
-          if (typeof canvasToUse.getContext !== 'function') {
-            throw new Error('Canvas does not support getContext method');
-          }
-          
-          // Try to get context with fallback
-          let ctx = canvasToUse.getContext('2d');
-          if (!ctx) {
-            // Last resort: try to create a new canvas element if context creation fails
-            const tempCanvas = document.createElement('canvas');
-            ctx = tempCanvas.getContext('2d');
-            if (!ctx) {
-              throw new Error('Failed to get 2D context from any canvas');
+            const measured = previewContainerRef.current.clientWidth || 
+                           previewContainerRef.current.offsetWidth;
+            if (measured > 0) {
+              containerWidth = measured;
             }
           }
           
-          // Ensure canvas has proper dimensions with error handling
-          try {
-            canvasToUse.width = viewport.width;
-            canvasToUse.height = viewport.height;
-          } catch (dimensionError) {
-            console.warn('Failed to set canvas dimensions, using fallback:', dimensionError);
-            // Fallback to default dimensions if setting fails
-            canvasToUse.width = 800;
-            canvasToUse.height = 1056;
+          // Calculate scale with reasonable bounds
+          const scale = Math.max(0.5, Math.min(containerWidth / viewportBase.width, 2.5));
+          const viewport = page.getViewport({ scale });
+
+          // Get canvas context
+          const ctx = canvas.getContext('2d', { alpha: false });
+          if (!ctx) {
+            throw new Error('Failed to get canvas 2D context');
           }
+          
+          // Set canvas dimensions
+          canvas.width = Math.floor(viewport.width);
+          canvas.height = Math.floor(viewport.height);
+          
+          // Clear canvas before rendering
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
 
           const renderContext = {
             canvasContext: ctx,
             viewport: viewport,
             enableWebGL: false,
-            renderInteractiveForms: false
+            renderInteractiveForms: false,
+            intent: 'display'
           };
 
-          // Add timeout to prevent hanging renders - increased timeout for image PDFs
+          // Render with timeout protection
           const renderPromise = page.render(renderContext).promise;
           const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Render timeout after 30 seconds')), 30000);
+            setTimeout(() => reject(new Error('Render timeout')), 15000);
           });
 
-          // Use Promise.race to handle render timeouts
           await Promise.race([renderPromise, timeoutPromise]);
-          setLoading(false);
+          
+          if (mountedRef.current) {
+            setLoading(false);
+          }
         } catch (error) {
           console.error('Error rendering PDF page:', error);
-          // Improve error message to be more user-friendly
-          let userErrorMessage = 'Failed to render PDF page';
-          if (error.message.includes('null')) {
-            userErrorMessage = 'PDF preview not available: Canvas element not ready';
-          } else if (error.message.includes('timeout')) {
-            userErrorMessage = 'PDF preview timed out. Please try again.';
+          if (mountedRef.current) {
+            setError('Failed to render PDF page');
+            setLoading(false);
           }
-          setError(userErrorMessage);
-          setLoading(false);
         }
       };
 
       renderPage();
-    }, [pdfDoc, currentPage]);
+    }, [pdfDoc, currentPage, renderReady]);
 
     const goToPrevPage = () => {
-      setCurrentPage(prev => Math.max(1, prev - 1));
+      if (currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      }
     };
 
     const goToNextPage = () => {
-      setCurrentPage(prev => Math.min(totalPages, prev + 1));
+      if (currentPage < totalPages) {
+        setCurrentPage(prev => prev + 1);
+      }
     };
 
     if (!url) {
       return (
-        <div className="p-4 space-y-4">
-          <div className="text-center py-8">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-              <span className="text-2xl font-bold text-gray-600 dark:text-gray-400">PDF</span>
-            </div>
-            <p className="text-muted-600 dark:text-muted-400">
-              No PDF available for preview
-            </p>
+        <div className="text-center py-8">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+            <span className="text-2xl font-bold text-gray-600 dark:text-gray-400">PDF</span>
           </div>
+          <p className="text-muted-600 dark:text-muted-400">
+            No PDF available for preview
+          </p>
         </div>
       );
     }
 
-    if (loading) {
+    if (loading && !renderReady) {
       return (
-        <div className="p-4 space-y-4">
-          <div className="text-center py-8">
-            <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
-            </div>
-            <p className="text-muted-600 dark:text-muted-400">
-              Loading PDF preview...
-            </p>
+        <div className="text-center py-8">
+          <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
           </div>
+          <p className="text-muted-600 dark:text-muted-400">
+            Loading PDF...
+          </p>
         </div>
       );
     }
 
     if (error) {
       return (
-        <div className="p-4 space-y-4">
-          <div className="text-center py-8">
-            <div className="w-16 h-16 mx-auto mb-4 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
-              <span className="text-2xl font-bold text-red-600 dark:text-red-400">PDF</span>
-            </div>
-            <p className="text-muted-600 dark:text-muted-400">
-              PDF preview not available: {error}
-            </p>
+        <div className="text-center py-8">
+          <div className="w-16 h-16 mx-auto mb-4 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
+            <span className="text-2xl font-bold text-red-600 dark:text-red-400">!</span>
           </div>
+          <p className="text-muted-600 dark:text-muted-400">
+            {error}
+          </p>
         </div>
       );
     }
 
     return (
-      <div className="p-4 space-y-4">
+      <div className="space-y-4 w-full">
         {totalPages > 1 && (
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between">
             <button
               onClick={goToPrevPage}
               disabled={currentPage <= 1}
@@ -456,9 +367,19 @@ function App() {
           </div>
         )}
         
-        <div ref={previewContainerRef} className="border border-muted-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-900">
-          <canvas ref={canvasRef} className="w-full h-auto max-h-96 object-contain" />
+        <div ref={previewContainerRef} className="w-full bg-white dark:bg-gray-900 p-4 rounded-lg flex items-center justify-center">
+          <canvas 
+            ref={canvasRef} 
+            className="max-w-full h-auto shadow-lg"
+            style={{ display: 'block' }}
+          />
         </div>
+        
+        {loading && (
+          <div className="text-center py-2">
+            <span className="text-sm text-muted-600 dark:text-muted-400">Rendering...</span>
+          </div>
+        )}
       </div>
     );
   };
@@ -1010,31 +931,13 @@ function App() {
         const fileSize = pdfBlob.size;
         const pdfFileName = getOutputFilename(filename, 'convert');
         
-        // Always provide the download link first
+        // Set download links with the PDF
         setDownloadLinks([{
           url: pdfBlobUrl,
           filename: pdfFileName,
-          operation: 'convert'
+          operation: 'convert',
+          isPdf: true  // Add flag to indicate this is a PDF for preview
         }]);
-        
-        // Load the PDF data for preview with optimized handling
-        try {
-          setTerminalData('Loading PDF for preview...');
-          
-          // Directly use the blob URL for preview without extra conversion
-          setPdfUrl(pdfBlobUrl);
-          setFileInfo({
-            name: pdfFileName,
-            size: fileSize,
-            type: 'application/pdf',
-            lastModified: new Date().getTime()
-          });
-          
-          // No need to update download links again - we're using the same URL
-        } catch (previewError) {
-          console.error('Error setting up PDF for preview:', previewError);
-          // Keep the original blob URL for download
-        }
       }
       
       setState("toBeDownloaded");
@@ -2063,37 +1966,40 @@ function App() {
             {/* File previews below */}
             {downloadLinks.map((link, index) => (
               <div key={index} className="card">
-                <div className="flex flex-col md:flex-row gap-6 items-center">
-                  {/* Preview Section */}
-                  <div className="flex-1">
-                    <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                      {link.filename}
-                      {link.page && link.totalPages && link.totalPages > 1 && (
-                        <span className="text-sm text-muted-600 dark:text-muted-400 ml-2">
-                          (Page {link.page} of {link.totalPages})
-                        </span>
-                      )}
-                    </h4>
-                    
-                    {/* Preview for converted files */}
-                    {link.operation === 'convert' && link.url && (
+                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                  {link.filename}
+                  {link.page && link.totalPages && link.totalPages > 1 && (
+                    <span className="text-sm text-muted-600 dark:text-muted-400 ml-2">
+                      (Page {link.page} of {link.totalPages})
+                    </span>
+                  )}
+                </h4>
+                
+                <div className="flex flex-col md:flex-row gap-6">
+                  {/* Preview Section - Full width container */}
+                  {link.operation === 'convert' && link.url && (
+                    <div className="flex-1 w-full">
                       <div className="border border-muted-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-900">
                         {link.filename.match(/\.(jpg|jpeg|png|bmp)$/i) ? (
                           <img 
                             src={link.url} 
                             alt={link.filename}
-                            className="w-full h-auto max-h-64 object-contain"
+                            className="w-full h-auto max-h-96 object-contain"
                             onError={(e) => {
+                              console.error('Image preview failed:', link.filename);
                               e.target.style.display = 'none';
-                              e.target.nextSibling.style.display = 'block';
+                              const fallback = e.target.parentElement.querySelector('.preview-fallback');
+                              if (fallback) fallback.style.display = 'block';
                             }}
                           />
                         ) : link.filename.endsWith('.pdf') ? (
-                          <PdfPreview url={link.url} />
+                          <div className="w-full min-h-[400px]">
+                            <PdfPreview url={link.url} />
+                          </div>
                         ) : null}
                         
                         {/* Fallback for failed preview */}
-                        <div className="hidden p-8 text-center">
+                        <div className="preview-fallback hidden p-8 text-center">
                           <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
                             <span className="text-2xl font-bold text-gray-600 dark:text-gray-400">📄</span>
                           </div>
@@ -2102,24 +2008,24 @@ function App() {
                           </p>
                         </div>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                   
                   {/* Download Section */}
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-3 md:w-auto w-full">
                     <a
                       href={link.url}
                       download={link.filename}
-                      className="btn-success text-lg px-6 py-3 rounded-xl text-center"
+                      className="btn-success text-lg px-6 py-3 rounded-xl text-center whitespace-nowrap"
                     >
                       {t('download', { filename: link.filename })}
                     </a>
                     
-                    {/* Preview button for images */}
-                    {link.filename.match(/\.(jpg|jpeg|png|bmp)$/i) && (
+                    {/* Preview button for images and PDFs */}
+                    {(link.filename.match(/\.(jpg|jpeg|png|bmp|pdf)$/i)) && (
                       <button
                         onClick={() => window.open(link.url, '_blank')}
-                        className="btn-secondary text-lg px-6 py-3 rounded-xl"
+                        className="btn-secondary text-lg px-6 py-3 rounded-xl whitespace-nowrap"
                       >
                         {t('preview')}
                       </button>
