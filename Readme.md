@@ -8,6 +8,7 @@ This is a PDF processing tool that runs entirely in your browser. It provides th
 - **Compress PDF**: Reduce PDF file size while maintaining quality.
 - **Parse PDF**: Extract text content from PDF documents.
 - **Advanced Parse PDF**: Use OCR to extract images, metadata, and other structured information.
+- **File Conversion**: Convert PDF to other formats (e.g., JPG, PNG, JPEG, BMP) and convert images to PDF.
 
 ## Context
 
