@@ -86,7 +86,21 @@ function validateArgs(args, operation) {
   return true;
 }
 
+let wasmUrl = null;
 function loadScript() {
+  try {
+    // Resolve wasm asset URL via Vite bundling
+    wasmUrl = new URL('./gs-worker.wasm', import.meta.url).toString();
+  } catch (e) {
+    // Fallback: base path public location
+    wasmUrl = `${location.origin}/web-local-pdf-tools/gs-worker.wasm`;
+  }
+  // Hint to emscripten loader to find wasm from our resolved URL
+  self.Module = self.Module || {};
+  self.Module.locateFile = (path /*, dir*/ ) => {
+    if (path === 'gs-worker.wasm') return wasmUrl;
+    return path;
+  };
   import("./gs-worker.js");
 }
 
