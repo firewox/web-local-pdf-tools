@@ -1,9 +1,18 @@
 import { useState, useRef, useEffect } from "react";
 import * as pdfjsLib from 'pdfjs-dist';
 import { useTranslation } from 'react-i18next';
-import PdfPreview from './components/pdf/PdfPreview.jsx';
-import ProgressBar from './components/common/ProgressBar.jsx';
-import TerminalOutput from './components/common/TerminalOutput.jsx';
+import LoadingPanel from './components/state/LoadingPanel.jsx';
+import ErrorPanel from './components/state/ErrorPanel.jsx';
+import DownloadList from './components/state/DownloadList.jsx';
+import FileSelector from './components/file/FileSelector.jsx';
+import SettingsPanel from './components/settings/SettingsPanel.jsx';
+import ConvertFormatSelector from './components/settings/ConvertFormatSelector.jsx';
+import HeaderNav from './components/common/HeaderNav.jsx';
+import OperationIntro from './components/common/OperationIntro.jsx';
+import PdfParsePreview from './components/parse/PdfParsePreview.jsx';
+import ParsedTextPanel from './components/parse/ParsedTextPanel.jsx';
+import PageSubtitle from './components/common/PageSubtitle.jsx';
+import ActionSubmit from './components/common/ActionSubmit.jsx';
 import { isPdfFile, isImageFile, parsePageSelection, reorderFiles } from './utils/pdf.js';
 import { processWithGS } from './services/pdfService.js';
 import { createPdfWithMultipleImages } from './services/imagePdf.js';
@@ -1241,411 +1250,132 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-muted-50 to-muted-100 dark:from-gray-900 dark:to-gray-800">
       {/* Responsive Navbar Header */}
-      <header className="w-full bg-white dark:bg-gray-900 shadow-soft border-b border-muted-200 dark:border-gray-800">
-        <nav className="container mx-auto max-w-4xl px-4 py-4 flex flex-row items-center justify-between">
-          {/* Left: Page Title + Top Menu */}
-          <div className="flex items-center h-full">
-            <img
-              src="/web-local-pdf-tools/pdf-file.svg"
-              alt="PDF Icon"
-              className="w-8 h-8 md:w-10 md:h-10 mr-3"
-              style={{ display: 'inline-block', verticalAlign: 'middle' }}
-            />
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white whitespace-nowrap inline-block align-middle">
-              {t('title')}
-            </h1>
-            {/* Top bar menu */}
-            <div className="ml-6 flex items-center gap-2">
-              <button
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${activeTab === 'split' ? 'bg-primary-600 text-white shadow-soft' : 'text-muted-600 dark:text-muted-400 hover:text-gray-900 dark:hover:text-white hover:bg-muted-100 dark:hover:bg-gray-800'}`}
-                onClick={() => {
-                  if (activeTab !== 'split') {
-                    setActiveTab('split');
-                    resetForm();
-                  }
-                }}
-                title={t('split')}
-              >
-                {t('split')}
-              </button>
-              <button
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${activeTab === 'merge' ? 'bg-primary-600 text-white shadow-soft' : 'text-muted-600 dark:text-muted-400 hover:text-gray-900 dark:hover:text-white hover:bg-muted-100 dark:hover:bg-gray-800'}`}
-                onClick={() => {
-                  if (activeTab !== 'merge') {
-                    setActiveTab('merge');
-                    resetForm();
-                  }
-                }}
-                title={t('merge')}
-              >
-                {t('merge')}
-              </button>
-              <button
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${activeTab === 'compress' ? 'bg-primary-600 text-white shadow-soft' : 'text-muted-600 dark:text-muted-400 hover:text-gray-900 dark:hover:text-white hover:bg-muted-100 dark:hover:bg-gray-800'}`}
-                onClick={() => {
-                  if (activeTab !== 'compress') {
-                    setActiveTab('compress');
-                    resetForm();
-                  }
-                }}
-                title={t('compress')}
-              >
-                {t('compress')}
-              </button>
-              <button
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${activeTab === 'parse' ? 'bg-primary-600 text-white shadow-soft' : 'text-muted-600 dark:text-muted-400 hover:text-gray-900 dark:hover:text-white hover:bg-muted-100 dark:hover:bg-gray-800'}`}
-                onClick={() => {
-                  if (activeTab !== 'parse') {
-                    setActiveTab('parse');
-                    resetForm();
-                  }
-                }}
-                title={t('parse')}
-              >
-                {t('parse')}
-              </button>
-              <button
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${activeTab === 'convert' ? 'bg-primary-600 text-white shadow-soft' : 'text-muted-600 dark:text-muted-400 hover:text-gray-900 dark:hover:text-white hover:bg-muted-100 dark:hover:bg-gray-800'}`}
-                onClick={() => {
-                  if (activeTab !== 'convert') {
-                    setActiveTab('convert');
-                    resetForm();
-                  }
-                }}
-                title={t('convert')}
-              >
-                {t('convert')}
-              </button>
-            </div>
-          </div>
-          {/* Right: Buttons */}
-          <div className="flex items-center h-full">
-            <RightButtonBar />
-            {/* Add more right-side buttons here if needed */}
-          </div>
-        </nav>
-      </header>
+      <HeaderNav t={t} activeTab={activeTab} setActiveTab={setActiveTab} resetForm={resetForm} />
       <div className="container mx-auto max-w-4xl px-4 py-8">
         {/* Info below navbar */}
-        <div className="text-center mb-12">
-          <p 
-            className="text-lg text-muted-600 dark:text-muted-300 max-w-2xl mx-auto"
-            dangerouslySetInnerHTML={{
-              __html: t('subtitle')
-            }}
-          />
-        </div>
+        <PageSubtitle t={t} />
 
         {/* Tabs removed per specification: switching via top bar menu only */}
 
         {/* Tab Content */}
-        <div className="card mb-8">
-          {activeTab === 'compress' && (
-            <div className="text-center">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">{t('compress')} PDF</h3>
-              <p className="text-muted-600 dark:text-muted-300">{t('compressDesc')}</p>
-            </div>
-          )}
-          {activeTab === 'merge' && (
-            <div className="text-center">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">{t('merge')} PDFs</h3>
-              <p className="text-muted-600 dark:text-muted-300">{t('mergeDesc')}</p>
-            </div>
-          )}
-          {activeTab === 'split' && (
-            <div className="text-center">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">{t('split')} PDF</h3>
-              <p className="text-muted-600 dark:text-muted-300">{t('splitDesc')}</p>
-            </div>
-          )}
-          {activeTab === 'parse' && (
-            <div className="text-center">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">{t('parse')} PDF</h3>
-              <p className="text-muted-600 dark:text-muted-300">{t('parseDesc')}</p>
-            </div>
-          )}
-          {activeTab === 'convert' && (
-            <div className="text-center">
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">{t('convert')} File</h3>
-              <p className="text-muted-600 dark:text-muted-300">{t('convertDesc')}</p>
-            </div>
-          )}
-        </div>
+        <OperationIntro t={t} activeTab={activeTab} />
 
         {state !== "loading" && state !== "toBeDownloaded" && state !== "error" && (
           <form onSubmit={onSubmit} className="space-y-8">
-            {renderFileInput()}
+            <FileSelector
+              t={t}
+              activeTab={activeTab}
+              files={files}
+              changeHandler={changeHandler}
+              clearAllFiles={clearAllFiles}
+              removeFile={removeFile}
+              addMoreFiles={addMoreFiles}
+              draggingIndex={draggingIndex}
+              dragOverIndex={dragOverIndex}
+              handleDragStart={handleDragStart}
+              handleDragEnter={handleDragEnter}
+              handleDragOver={handleDragOver}
+              handleDrop={handleDrop}
+              handleDragEnd={handleDragEnd}
+              fileReorderEnabled={isFileReorderEnabled()}
+              imageReorderMode={isImageReorderMode()}
+            />
         
         {files.length > 0 && state === "selected" && activeTab === 'convert' && (
           <div className="card mt-6">
-            <div className="space-y-4">
-              <label className="block text-sm font-medium text-gray-900 dark:text-white">
-                {t('convertTo')}
-              </label>
-              <select
-                value={convertFormat}
-                onChange={(e) => setConvertFormat(e.target.value)}
-                className="input"
-                disabled={supportedFormats.length === 0}
-              >
-                <option value="">选择格式</option>
-                {supportedFormats.map(format => (
-                  <option key={format.value} value={format.value}>{format.label}</option>
-                ))}
-              </select>
-            </div>
+            <ConvertFormatSelector
+              t={t}
+              convertFormat={convertFormat}
+              setConvertFormat={setConvertFormat}
+              supportedFormats={supportedFormats}
+            />
           </div>
         )}
         
-        {renderSettings()}
+        <SettingsPanel
+          t={t}
+          useCustomCommand={useCustomCommand}
+          customCommand={customCommand}
+          setCustomCommand={setCustomCommand}
+          PDF_SETTINGS={PDF_SETTINGS}
+          activeTab={activeTab}
+          pdfSetting={pdfSetting}
+          setPdfSetting={setPdfSetting}
+          splitRange={splitRange}
+          setSplitRange={setSplitRange}
+          showTerminalOutput={showTerminalOutput}
+          setShowTerminalOutput={setShowTerminalOutput}
+          showProgressBar={showProgressBar}
+          setShowProgressBar={setShowProgressBar}
+          useAdvancedSettings={useAdvancedSettings}
+          setUseAdvancedSettings={setUseAdvancedSettings}
+          advancedSettings={advancedSettings}
+          setAdvancedSettings={setAdvancedSettings}
+          convertFormat={convertFormat}
+          files={files}
+          selectedPages={selectedPages}
+          setSelectedPages={setSelectedPages}
+          pdfPageCount={pdfPageCount}
+          isPdfSelected={files.some(f => isPdfFile(f.file))}
+        />
 
         {state === "selected" && (
-          <div className="text-center">
-            <button
-              type="submit"
-              className="btn-primary text-lg px-8 py-4 rounded-xl"
-              disabled={activeTab === 'convert' && !convertFormat}
-            >
-              {activeTab === 'compress' && t('compressPdf')}
-              {activeTab === 'merge' && t('mergePdfs')}
-              {activeTab === 'split' && t('splitPdf')}
-              {activeTab === 'parse' && t('parsePdf')}
-              {activeTab === 'convert' && t('convertFile')}
-            </button>
-          </div>
+          <ActionSubmit t={t} activeTab={activeTab} convertFormat={convertFormat} />
         )}
           </form>
         )}
 
         {state === "loading" && (
-          <div className="card text-center space-y-4">
-            <div className="text-2xl mb-4 animate-spin-slow">🔄</div>
-            <p className="text-lg font-medium text-gray-900 dark:text-white">
-              {t('processing', { count: activeTab === 'merge' ? 's' : '' })}
-            </p>
-
-            {/* Progress Bar */}
-            {showProgressBar && (
-              <ProgressBar progressInfo={progressInfo} t={t} />
-            )}
-
-            {/* Terminal Output Display */}
-            {showTerminalOutput && (
-              <TerminalOutput ref={terminalRef} terminalData={terminalData} t={t} />
-            )}
-          </div>
+          <LoadingPanel
+            t={t}
+            activeTab={activeTab}
+            showProgressBar={showProgressBar}
+            progressInfo={progressInfo}
+            showTerminalOutput={showTerminalOutput}
+            terminalData={terminalData}
+            terminalRef={terminalRef}
+          />
         )}
 
         {state === "error" && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-2xl p-6 text-center">
-            <div className="text-red-600 dark:text-red-400 mb-4">
-              <p className="text-lg font-semibold mb-2">{t('errorOccurred')}</p>
-              <div className="bg-white dark:bg-gray-800 border border-red-200 dark:border-red-700 rounded-xl p-4 text-left">
-                <pre className="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap break-words font-mono">
-                  {errorMessage}
-                </pre>
-              </div>
-            </div>
-            <button onClick={resetForm} className="btn-danger">
-              {t('tryAgain')}
-            </button>
-          </div>
+          <ErrorPanel t={t} errorMessage={errorMessage} onTryAgain={resetForm} />
         )}
 
         {state === "parsed" && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Left: PDF Preview */}
-            <div className="card overflow-hidden">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-lg font-semibold text-gray-900 dark:text-white">{t('pdfPreview')}</h4>
-              </div>
-              <div ref={previewContainerRef} className="border border-muted-200 dark:border-gray-700 rounded-xl overflow-hidden relative">
-                <canvas ref={canvasRef} className="w-full bg-white dark:bg-gray-900"></canvas>
-                <div
-                  ref={textLayerRef}
-                  className="absolute left-0 top-0 w-full h-full"
-                  onMouseUp={handleLeftSelection}
-                />
-              </div>
-            </div>
+            <PdfParsePreview
+              t={t}
+              previewContainerRef={previewContainerRef}
+              canvasRef={canvasRef}
+              textLayerRef={textLayerRef}
+              handleLeftSelection={handleLeftSelection}
+            />
 
-            {/* Right: Extracted Text */}
-            <div className="card space-y-6">
-              <div className="flex items-center justify-between">
-                <h4 className="text-lg font-semibold text-gray-900 dark:text-white">{t('extractedText')}</h4>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="btn-secondary px-4 py-2 rounded-xl"
-                    onClick={() => navigator.clipboard.writeText(parsedPages.join('\n\n'))}
-                  >
-                    {t('copyAll')}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary px-4 py-2 rounded-xl"
-                    onClick={() => {
-                      const blob = new Blob([parsedPages.join('\n\n')], { type: 'text/plain' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = (files[0]?.filename || 'output.pdf').replace(/\.pdf$/i, '') + '.txt';
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                      URL.revokeObjectURL(url);
-                    }}
-                  >
-                    {t('exportTxt')}
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <button
-                  type="button"
-                  className="btn-secondary px-4 py-2 rounded-xl"
-                  onClick={() => setCurrentParsedPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentParsedPage <= 1}
-                >
-                  {t('prev')}
-                </button>
-                <span className="text-sm text-muted-600 dark:text-muted-400">
-                  {t('page')} {currentParsedPage} / {parsedPages.length}
-                </span>
-                <button
-                  type="button"
-                  className="btn-secondary px-4 py-2 rounded-xl"
-                  onClick={() => setCurrentParsedPage(prev => Math.min(parsedPages.length, prev + 1))}
-                  disabled={currentParsedPage >= parsedPages.length}
-                >
-                  {t('next')}
-                </button>
-              </div>
-
-              <div
-                ref={rightTextRef}
-                onMouseUp={handleRightSelection}
-                className="bg-muted-50 dark:bg-gray-700 border border-muted-200 dark:border-gray-600 rounded-xl p-4 text-sm whitespace-pre-wrap break-words text-gray-900 dark:text-white"
-              >
-                {(parsedPageItems[currentParsedPage - 1] || []).length > 0 ? (
-                  (parsedPageItems[currentParsedPage - 1] || []).map((item, idx) => (
-                    <span key={idx} data-index={idx}>
-                      {item.str + ' '}
-                    </span>
-                  ))
-                ) : (
-                  <pre className="text-sm whitespace-pre-wrap break-words">{parsedPages[currentParsedPage - 1] || ''}</pre>
-                )}
-              </div>
-
-              <div className="text-center">
-                <button
-                  type="button"
-                  className="btn-secondary text-lg px-8 py-4 rounded-xl"
-                  onClick={() => navigator.clipboard.writeText(parsedPages[currentParsedPage - 1] || '')}
-                >
-                  {t('copyPage')}
-                </button>
-              </div>
-            </div>
+            <ParsedTextPanel
+              t={t}
+              parsedPages={parsedPages}
+              parsedPageItems={parsedPageItems}
+              currentParsedPage={currentParsedPage}
+              setCurrentParsedPage={setCurrentParsedPage}
+              rightTextRef={rightTextRef}
+              handleRightSelection={handleRightSelection}
+              baseFilename={(files[0]?.filename || 'output.pdf')}
+            />
           </div>
         )}
 
         {state === "toBeDownloaded" && (
-          <div className="space-y-6">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-white text-center">
-              {t('conversionComplete')}
-            </h3>
-            
-            {/* Action buttons at the top */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button onClick={processAgain} className="btn-secondary text-lg px-8 py-4 rounded-xl">
-                {t('processAgain')}
-              </button>
-              <button onClick={() => {
-                resetForm();
-                // Trigger file selection dialog after a short delay to ensure form is reset
-                setTimeout(() => {
-                  document.getElementById('files').click();
-                }, 100);
-              }} className="btn-primary text-lg px-8 py-4 rounded-xl">
-                {t('chooseNewFiles')}
-              </button>
-            </div>
-            
-            {/* File previews below */}
-            {downloadLinks.map((link, index) => (
-              <div key={index} className="card">
-                <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  {link.filename}
-                  {link.page && link.totalPages && link.totalPages > 1 && (
-                    <span className="text-sm text-muted-600 dark:text-muted-400 ml-2">
-                      (Page {link.page} of {link.totalPages})
-                    </span>
-                  )}
-                </h4>
-                
-                <div className="flex flex-col md:flex-row gap-6">
-                  {/* Preview Section - Full width container */}
-                  {link.operation === 'convert' && link.url && (
-                    <div className="flex-1 w-full">
-                      <div className="border border-muted-200 dark:border-gray-700 rounded-xl overflow-hidden bg-white dark:bg-gray-900">
-                        {link.filename.match(/\.(jpg|jpeg|png|bmp)$/i) ? (
-                          <img 
-                            src={link.url} 
-                            alt={link.filename}
-                            className="w-full h-auto max-h-96 object-contain"
-                            onError={(e) => {
-                              console.error('Image preview failed:', link.filename);
-                              e.target.style.display = 'none';
-                              const fallback = e.target.parentElement.querySelector('.preview-fallback');
-                              if (fallback) fallback.style.display = 'block';
-                            }}
-                          />
-                        ) : link.filename.endsWith('.pdf') ? (
-                          <div className="w-full min-h-[400px]">
-                            <PdfPreview url={link.url} t={t} />
-                          </div>
-                        ) : null}
-                        
-                        {/* Fallback for failed preview */}
-                        <div className="preview-fallback hidden p-8 text-center">
-                          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                            <span className="text-2xl font-bold text-gray-600 dark:text-gray-400">📄</span>
-                          </div>
-                          <p className="text-muted-600 dark:text-muted-400">
-                            Preview not available
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Download Section */}
-                  <div className="flex flex-col gap-3 md:w-auto w-full">
-                    <a
-                      href={link.url}
-                      download={link.filename}
-                      className="btn-success text-lg px-6 py-3 rounded-xl text-center whitespace-nowrap"
-                    >
-                      {t('download', { filename: link.filename })}
-                    </a>
-                    
-                    {/* Preview button for images and PDFs */}
-                    {(link.filename.match(/\.(jpg|jpeg|png|bmp|pdf)$/i)) && (
-                      <button
-                        onClick={() => window.open(link.url, '_blank')}
-                        className="btn-secondary text-lg px-6 py-3 rounded-xl whitespace-nowrap"
-                      >
-                        {t('preview')}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <DownloadList
+            t={t}
+            downloadLinks={downloadLinks}
+            onProcessAgain={processAgain}
+            onChooseNewFiles={() => {
+              resetForm();
+              setTimeout(() => {
+                document.getElementById('files').click();
+              }, 100);
+            }}
+          />
         )}
 
         {/* Info Section */}
