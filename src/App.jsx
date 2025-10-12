@@ -1,6 +1,16 @@
-import { useState, useRef, useEffect } from "react";
+import { useRef, useEffect } from "react";
 import * as pdfjsLib from 'pdfjs-dist';
 import { useTranslation } from 'react-i18next';
+import { PDF_SETTINGS, isPdfFile, isImageFile } from './utils/pdf.js';
+
+// Custom Hooks
+import { useAppState } from './hooks/useAppState';
+import { useSettings } from './hooks/useSettings';
+import { usePdfParse } from './hooks/usePdfParse';
+import { useFileHandling } from './hooks/useFileHandling';
+import { usePdfOperations } from './hooks/usePdfOperations';
+
+// Components
 import LoadingPanel from './components/state/LoadingPanel.jsx';
 import ErrorPanel from './components/state/ErrorPanel.jsx';
 import DownloadList from './components/state/DownloadList.jsx';
@@ -13,129 +23,111 @@ import PdfParsePreview from './components/parse/PdfParsePreview.jsx';
 import ParsedTextPanel from './components/parse/ParsedTextPanel.jsx';
 import PageSubtitle from './components/common/PageSubtitle.jsx';
 import ActionSubmit from './components/common/ActionSubmit.jsx';
-import { isPdfFile, isImageFile, parsePageSelection, reorderFiles } from './utils/pdf.js';
-import { processWithGS } from './services/pdfService.js';
-import { createPdfWithMultipleImages } from './services/imagePdf.js';
-// import { _GSPS2PDF } from "./lib/worker-init.js"; // moved to services
-import RightButtonBar from './components/RightButtonBar.jsx';
 
-function loadPDFData(response, filename) {
-  return new Promise((resolve, reject) => {
-    try {
-      // If response is already a blob URL (from createSimplePdfWithImage)
-      if (typeof response === 'string' && response.startsWith('blob:')) {
-        // Directly use the blob URL without unnecessary conversion
-        // Create a quick HEAD request to get file size without downloading full content
-        const xhr = new XMLHttpRequest();
-        xhr.open('HEAD', response);
-        xhr.onload = function() {
-          try {
-            // For blob URLs, we can't get the actual size from headers
-            // So we estimate based on response type
-            const estimatedSize = 0; // Will be updated later when actual data is loaded
-            resolve({ pdfURL: response, size: estimatedSize });
-          } catch (error) {
-            console.error('Error in HEAD request:', error);
-            // Fallback to using the original URL directly
-            resolve({ pdfURL: response, size: 0 });
-          }
-        };
-        xhr.onerror = function() {
-          // If HEAD request fails, just use the original URL
-          resolve({ pdfURL: response, size: 0 });
-        };
-        xhr.send();
-      } else {
-        // Original handling for array buffer data
-        const xhr = new XMLHttpRequest();
-        xhr.open("GET", response);
-        xhr.responseType = "arraybuffer";
-        xhr.onload = function () {
-          try {
-            window.URL.revokeObjectURL(response);
-            const blob = new Blob([xhr.response], { type: "application/pdf" });
-            const pdfURL = window.URL.createObjectURL(blob);
-            const size = xhr.response.byteLength;
-            resolve({ pdfURL, size });
-          } catch (error) {
-            console.error('Error creating blob from array buffer:', error);
-            reject(error);
-          }
-        };
-        xhr.onerror = function () {
-          reject(new Error('Failed to load PDF data'));
-        };
-        xhr.send();
-      }
-    } catch (error) {
-      console.error('Error in loadPDFData:', error);
-      reject(error);
-    }
-  });
-}
+
 
 function App() {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState("compress");
-  const [state, setState] = useState("init");
-  const [files, setFiles] = useState([]);
-  const [downloadLinks, setDownloadLinks] = useState([]);
-  const [pdfSetting, setPdfSetting] = useState("/ebook");
-  const [customCommand, setCustomCommand] = useState("");
-  const [useCustomCommand, setUseCustomCommand] = useState(false);
-  const [splitRange, setSplitRange] = useState({ startPage: "", endPage: "" });
-  const [errorMessage, setErrorMessage] = useState("");
-  const [showTerminalOutput, setShowTerminalOutput] = useState(false);
-  const [showProgressBar, setShowProgressBar] = useState(false);
-  const [terminalData, setTerminalData] = useState("");
-  const [progressInfo, setProgressInfo] = useState({ current: 0, total: 0, currentPage: 0 });
   const terminalRef = useRef(null);
-  const [parsedPages, setParsedPages] = useState([]);
-  const [currentParsedPage, setCurrentParsedPage] = useState(1);
-  // Parse preview & highlight state
-  const pdfDocRef = useRef(null);
-  const canvasRef = useRef(null);
-  const textLayerRef = useRef(null);
-  const previewContainerRef = useRef(null);
-  const rightTextRef = useRef(null);
-  const [parsedPageItems, setParsedPageItems] = useState([]);
-  const [highlightMap, setHighlightMap] = useState({});
-  
-  // PDF preview and file info states
-  const [pdfUrl, setPdfUrl] = useState(null);
-  const [fileInfo, setFileInfo] = useState(null);
 
-  // PDF Settings presets
-  const PDF_SETTINGS = {
-    '/screen': t('screenOptimized'),
-    '/ebook': t('ebook'),
-    '/printer': t('printer'),
-    '/prepress': t('prepress'),
-    '/default': t('default')
-  };
+  const {
+    activeTab,
+    setActiveTab,
+    state,
+    setState,
+    files,
+    setFiles,
+    downloadLinks,
+    setDownloadLinks,
+    errorMessage,
+    setErrorMessage,
+    showTerminalOutput,
+    setShowTerminalOutput,
+    showProgressBar,
+    setShowProgressBar,
+    terminalData,
+    setTerminalData,
+    progressInfo,
+    setProgressInfo,
+    pdfUrl,
+    fileInfo,
+  } = useAppState();
 
-  // Simplified advanced PDF settings
-  const [advancedSettings, setAdvancedSettings] = useState({
-    compatibilityLevel: "1.4",
-    colorImageSettings: {
-      downsample: true,
-      resolution: 300
-    }
+  const {
+    pdfSetting,
+    setPdfSetting,
+    customCommand,
+    setCustomCommand,
+    useCustomCommand,
+    setUseCustomCommand,
+    splitRange,
+    setSplitRange,
+    advancedSettings,
+    setAdvancedSettings,
+    useAdvancedSettings,
+    convertFormat,
+    setConvertFormat,
+    supportedFormats,
+    selectedPages,
+    setSelectedPages,
+    pdfPageCount,
+    setPdfPageCount,
+  } = useSettings();
+
+  const {
+    parsedPages,
+    currentParsedPage,
+    setCurrentParsedPage,
+    pdfDocRef,
+    canvasRef,
+    textLayerRef,
+    previewContainerRef,
+    rightTextRef,
+    parsedPageItems,
+    highlightMap,
+    setHighlightMap,
+  } = usePdfParse();
+
+  const {
+    draggingIndex,
+    dragOverIndex,
+    handleDragStart,
+    handleDragEnter,
+    handleDragOver,
+    handleDrop,
+    handleDragEnd,
+    removeFile,
+    clearAllFiles,
+    addMoreFiles,
+    changeHandler,
+  } = useFileHandling(files, setFiles, activeTab, setState, setErrorMessage, t);
+
+  const {
+    onSubmit,
+    resetForm,
+    processAgain,
+  } = usePdfOperations({
+    files,
+    setFiles,
+    activeTab,
+    customCommand,
+    useCustomCommand,
+    pdfSetting,
+    splitRange,
+    advancedSettings,
+    useAdvancedSettings,
+    convertFormat,
+    selectedPages,
+    setState,
+    setErrorMessage,
+    setDownloadLinks,
+    setTerminalData,
+    setProgressInfo,
+    setParsedPages: (pages) => usePdfParse().setParsedPages(pages),
+    setParsedPageItems: (items) => usePdfParse().setParsedPageItems(items),
+    pdfDocRef,
+    t,
   });
-  const [useAdvancedSettings, setUseAdvancedSettings] = useState(false);
-  
-  // Convert feature state
-  const [convertFormat, setConvertFormat] = useState("");
-  const [supportedFormats, setSupportedFormats] = useState([]);
-  
-  // PDF to image page selection state
-  const [selectedPages, setSelectedPages] = useState("");
-  const [pdfPageCount, setPdfPageCount] = useState(0);
-  const [draggingIndex, setDraggingIndex] = useState(null);
-  const [dragOverIndex, setDragOverIndex] = useState(null);
-  const dragSourceIndexRef = useRef(null);
-
-  // PdfPreview extracted to src/components/pdf/PdfPreview.jsx
 
   // Auto-scroll terminal output to bottom
   useEffect(() => {
@@ -143,109 +135,6 @@ function App() {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
   }, [terminalData]);
-
-  // Function to extract progress information from terminal output
-  const parseProgressFromOutput = (output) => {
-    // Extract total pages from "Processing pages X through Y"
-    const totalPagesMatch = output.match(/Processing pages \d+ through (\d+)/);
-    if (totalPagesMatch) {
-      const totalPages = parseInt(totalPagesMatch[1]);
-      setProgressInfo(prev => ({ ...prev, total: totalPages }));
-    }
-
-    // Extract current page from "Page X" 
-    const currentPageMatch = output.match(/^Page (\d+)$/);
-    if (currentPageMatch) {
-      const currentPage = parseInt(currentPageMatch[1]);
-      setProgressInfo(prev => ({
-        ...prev,
-        currentPage: currentPage,
-        current: currentPage // Update current to match the page being processed
-      }));
-    }
-  };
-
-  async function processPDF(operation, inputFiles, filename) {
-    setState("loading");
-    setTerminalData(""); // Clear previous terminal data
-    setProgressInfo({ current: 0, total: 0, currentPage: 0 }); // Reset progress
-
-    try {
-      let dataObject = {
-        operation,
-        pdfSetting: useCustomCommand ? null : pdfSetting,
-        customCommand: useCustomCommand ? customCommand : null,
-        advancedSettings: useAdvancedSettings ? advancedSettings : null,
-        showTerminalOutput: showTerminalOutput, // Pass terminal output setting to worker
-        showProgressBar: showProgressBar, // Pass progress bar setting to worker
-        convertFormat: activeTab === 'convert' ? convertFormat : null
-      };
-
-      if (operation === 'merge') {
-        dataObject.files = inputFiles.map(file => file.url);
-      } else if (operation === 'split') {
-        dataObject.psDataURL = inputFiles[0].url;
-        dataObject.splitRange = splitRange;
-      } else {
-        // compress
-        dataObject.psDataURL = inputFiles[0].url;
-      }
-
-      const result = await processWithGS(
-        dataObject,
-        (showTerminalOutput || showProgressBar) ? (outputText) => {
-          if (showTerminalOutput) {
-            setTerminalData(prev => prev + outputText + '\n');
-          }
-          if (showProgressBar) {
-            parseProgressFromOutput(outputText);
-          }
-        } : null
-      );
-
-      // Check for errors in the result
-      if (result.error) {
-        console.error("Processing failed:", result.error);
-        setState("error");
-        setErrorMessage(result.error);
-        setTerminalData(""); // Clear terminal output on error
-        setProgressInfo({ current: 0, total: 0, currentPage: 0 }); // Reset progress on error
-        return;
-      }
-
-      // Prefer ArrayBuffer from worker to create blob URL in main thread
-      let pdfURL;
-      let newSize = 0;
-      if (result.pdfArrayBuffer) {
-        const blob = new Blob([result.pdfArrayBuffer], { type: 'application/pdf' });
-        pdfURL = URL.createObjectURL(blob);
-        newSize = blob.size;
-      } else {
-        const loaded = await loadPDFData(result.pdfDataURL, filename);
-        pdfURL = loaded.pdfURL;
-        newSize = loaded.size;
-      }
-
-      setDownloadLinks([{
-        url: pdfURL,
-        filename: getOutputFilename(filename, operation),
-        operation
-      }]);
-      setState("toBeDownloaded");
-      setTerminalData(""); // Clear terminal output when done
-      setProgressInfo({ current: 0, total: 0, currentPage: 0 }); // Reset progress when done
-
-    } catch (error) {
-      console.error("Processing failed:", error);
-      setState("error");
-      setErrorMessage(error.message || "An unexpected error occurred during processing");
-      setTerminalData(""); // Clear terminal output on error
-      setProgressInfo({ current: 0, total: 0, currentPage: 0 }); // Reset progress on error
-    }
-  }
-
-  // Parse PDF text content per page using pdfjs-dist
-  
 
   // Render pdf to canvas and build text layer for selection
   async function renderPdfPage(pageNum) {
@@ -440,104 +329,9 @@ function App() {
     document.addEventListener('selectionchange', onSelectionChange);
     return () => document.removeEventListener('selectionchange', onSelectionChange);
   }, [state, currentParsedPage]);
-  async function parsePDF(files) {
-    try {
-      const file = files[0]?.file;
-      if (!file) return;
 
-      // Read file as ArrayBuffer
-      const arrayBuffer = await file.arrayBuffer();
 
-      // Configure worker for pdfjs
-      try {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
-      } catch (e) {
-        // Fallback silently if configuration fails
-      }
 
-      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-      const pdf = await loadingTask.promise;
-      pdfDocRef.current = pdf;
-      const numPages = pdf.numPages;
-
-      if (showProgressBar) {
-        setProgressInfo({ current: 0, total: numPages, currentPage: 0 });
-      }
-
-      const pagesText = [];
-      const pagesItems = [];
-      for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-        const page = await pdf.getPage(pageNum);
-        const textContent = await page.getTextContent();
-        const text = textContent.items.map(item => item.str).join(' ');
-        pagesText.push(text);
-        pagesItems.push(textContent.items);
-
-        if (showProgressBar) {
-          setProgressInfo(prev => ({ ...prev, current: pageNum, currentPage: pageNum }));
-        }
-      }
-
-      setParsedPages(pagesText);
-      setParsedPageItems(pagesItems);
-      setCurrentParsedPage(1);
-      setState('parsed');
-      setTerminalData('');
-      setProgressInfo({ current: 0, total: 0, currentPage: 0 });
-    } catch (error) {
-      console.error('Parsing failed:', error);
-      setState('error');
-      setErrorMessage(error.message || 'An unexpected error occurred during parsing');
-      setTerminalData('');
-      setProgressInfo({ current: 0, total: 0, currentPage: 0 });
-    }
-  }
-
-  function getOutputFilename(originalName, operation) {
-    const baseName = originalName.replace(/\.[^/.]+$/, ''); // Remove extension
-    switch (operation) {
-      case 'compress':
-        return `${baseName}-compressed.pdf`;
-      case 'merge':
-        return `merged-${Date.now()}.pdf`;
-      case 'split':
-        return `${baseName}-split-${splitRange.startPage}-${splitRange.endPage}.pdf`;
-      case 'convert':
-        return `${baseName}.${convertFormat}`;
-      default:
-        return `${baseName}-processed.pdf`;
-    }
-  }
-
-  // parsePageSelection 已提取到 utils/pdf.js
-
-  // isPdfFile 已提取到 utils/pdf.js
-
-  // isImageFile 已提取到 utils/pdf.js
-
-  const loadPdfPageCount = async (file) => {
-    try {
-      if (!file) {
-        setPdfPageCount(0);
-        return;
-      }
-
-      const arrayBuffer = await file.arrayBuffer();
-      try {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
-      } catch (e) {
-        // Ignore worker configuration errors here
-      }
-      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-      const pdf = await loadingTask.promise;
-      setPdfPageCount(pdf.numPages || 0);
-    } catch (error) {
-      console.error('Failed to load PDF metadata:', error);
-      setPdfPageCount(0);
-    }
-  };
-
-  // reorderFiles 已提取到 utils/pdf.js
 
   const isImageReorderMode = () => (
     activeTab === 'convert' && files.length > 1 && files.every(item => isImageFile(item.file))
@@ -547,705 +341,6 @@ function App() {
   const isFileReorderEnabled = () => (
     (activeTab === 'merge' && files.length > 1) || isImageReorderMode()
   );
-
-  async function convertFile(inputFiles, filename) {
-    setState("loading");
-    setTerminalData(""); // Clear previous terminal data
-    setProgressInfo({ current: 0, total: 0, currentPage: 0 }); // Reset progress
-
-    try {
-      const file = inputFiles[0].file;
-      const fileType = file.type;
-
-      // For PDF to image conversion
-      if (isPdfFile(file) && ['jpg', 'jpeg', 'png', 'bmp'].includes(convertFormat)) {
-        // Configure worker for pdfjs
-        try {
-          pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
-        } catch (e) {
-          // Fallback silently if configuration fails
-        }
-
-        const arrayBuffer = await file.arrayBuffer();
-        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-        const pdf = await loadingTask.promise;
-        const numPages = pdf.numPages;
-        
-        // Set page count for UI display
-        setPdfPageCount(numPages);
-        
-        // Parse user selected pages or use all pages
-        const pagesToConvert = parsePageSelection(selectedPages, numPages);
-        if (pagesToConvert.length === 0) {
-          throw new Error(t('invalidPageSelection'));
-        }
-        setProgressInfo({ current: 0, total: pagesToConvert.length, currentPage: 0 });
-
-        // Convert selected pages to images
-        const downloadLinks = [];
-        
-        for (const [index, pageNum] of pagesToConvert.entries()) {
-          const page = await pdf.getPage(pageNum);
-          const viewport = page.getViewport({ scale: 2.0 });
-          
-          const canvas = document.createElement('canvas');
-          // Safely access getContext with null check
-          if (!canvas || typeof canvas.getContext !== 'function') {
-            throw new Error('Canvas is not properly initialized');
-          }
-          const context = canvas.getContext('2d');
-          if (!context) {
-            throw new Error('Failed to get 2D context from canvas');
-          }
-          canvas.width = viewport.width;
-          canvas.height = viewport.height;
-          
-          const renderContext = {
-            canvasContext: context,
-            viewport: viewport
-          };
-          
-          await page.render(renderContext).promise;
-          
-          // Convert canvas to image
-          const imageUrl = canvas.toDataURL(`image/${convertFormat === 'jpg' ? 'jpeg' : convertFormat}`);
-          
-          // Create blob from data URL
-          const response = await fetch(imageUrl);
-          const blob = await response.blob();
-          const url = window.URL.createObjectURL(blob);
-          
-          // Create filename with page number
-          const baseName = filename.replace(/\.pdf$/i, '');
-          const pageFilename = numPages > 1 ? 
-            `${baseName}-page-${pageNum}.${convertFormat}` : 
-            `${baseName}.${convertFormat}`;
-          
-          downloadLinks.push({
-            url: url,
-            filename: pageFilename,
-            operation: 'convert',
-            page: pageNum,
-            totalPages: numPages
-          });
-          
-          // Update progress
-          setProgressInfo({ current: index + 1, total: pagesToConvert.length, currentPage: pageNum });
-        }
-        
-        setDownloadLinks(downloadLinks);
-      }
-      // For image to PDF conversion - support multiple images
-      else if (isImageFile(file) && convertFormat === 'pdf') {
-        const pdfArrayBuffer = await createPdfWithMultipleImages(inputFiles);
-
-        // Convert the ArrayBuffer to a Blob
-        const pdfBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
-        
-        // Create a blob URL for the PDF
-        const pdfBlobUrl = URL.createObjectURL(pdfBlob);
-        
-        // Set file info with actual size
-        const fileSize = pdfBlob.size;
-        const pdfFileName = getOutputFilename(filename, 'convert');
-        
-        // Set download links with the PDF
-        setDownloadLinks([{
-          url: pdfBlobUrl,
-          filename: pdfFileName,
-          operation: 'convert',
-          isPdf: true  // Add flag to indicate this is a PDF for preview
-        }]);
-      }
-      
-      setState("toBeDownloaded");
-      setTerminalData(""); // Clear terminal output when done
-      setProgressInfo({ current: 0, total: 0, currentPage: 0 }); // Reset progress when done
-      
-    } catch (error) {
-      console.error("Conversion failed:", error);
-      setState("error");
-      setErrorMessage(error.message || "An unexpected error occurred during conversion");
-      setTerminalData(""); // Clear terminal output on error
-      setProgressInfo({ current: 0, total: 0, currentPage: 0 }); // Reset progress on error
-    }
-  }
-
-  // 图片转 PDF 功能已提取到 services/imagePdf.js
-
-  const changeHandler = async (event) => {
-    const selectedFiles = Array.from(event.target.files);
-    if (selectedFiles.length === 0) {
-      return;
-    }
-
-    if (activeTab === 'convert') {
-      const containsPdf = selectedFiles.some(isPdfFile);
-      const containsImage = selectedFiles.some(isImageFile);
-
-      if (containsPdf && containsImage) {
-        alert(t('mixedConvertTypesNotSupported'));
-        return;
-      }
-
-      if (containsPdf) {
-        const pdfFile = selectedFiles.find(isPdfFile);
-        if (!pdfFile) {
-          return;
-        }
-
-        // Clean up existing object URLs
-        files.forEach(file => {
-          window.URL.revokeObjectURL(file.url);
-        });
-
-        const pdfObject = {
-          filename: pdfFile.name,
-          url: window.URL.createObjectURL(pdfFile),
-          file: pdfFile
-        };
-
-        setFiles([pdfObject]);
-        setSupportedFormats([
-          { value: 'jpg', label: 'JPG' },
-          { value: 'png', label: 'PNG' },
-          { value: 'jpeg', label: 'JPEG' },
-          { value: 'bmp', label: 'BMP' }
-        ]);
-        setConvertFormat((prev) => ['jpg', 'png', 'jpeg', 'bmp'].includes(prev) ? prev : 'jpg');
-        setSelectedPages('');
-        setPdfPageCount(0);
-        await loadPdfPageCount(pdfFile);
-      } else if (containsImage) {
-        const imageFiles = selectedFiles.filter(isImageFile);
-        if (imageFiles.length === 0) {
-          return;
-        }
-
-        const imageObjects = imageFiles.map(file => ({
-          filename: file.name,
-          url: window.URL.createObjectURL(file),
-          file
-        }));
-
-        setFiles(prevFiles => {
-          const existingImages = prevFiles.filter(item => {
-            const keep = isImageFile(item.file);
-            if (!keep) {
-              window.URL.revokeObjectURL(item.url);
-            }
-            return keep;
-          });
-          return [...existingImages, ...imageObjects];
-        });
-        setSupportedFormats([{ value: 'pdf', label: 'PDF' }]);
-        if (convertFormat !== 'pdf') {
-          setConvertFormat('pdf');
-        }
-        setPdfPageCount(0);
-        setSelectedPages('');
-      } else {
-        alert(t('unsupportedConvertType'));
-        return;
-      }
-
-      setDownloadLinks([]);
-      setPdfUrl(null);
-      setFileInfo(null);
-      setDraggingIndex(null);
-      setDragOverIndex(null);
-      dragSourceIndexRef.current = null;
-    } else {
-      const fileObjects = selectedFiles.map(file => ({
-        filename: file.name,
-        url: window.URL.createObjectURL(file),
-        file
-      }));
-
-      if (activeTab === 'merge') {
-        setFiles(prevFiles => [...prevFiles, ...fileObjects]);
-      } else {
-        files.forEach(file => {
-          window.URL.revokeObjectURL(file.url);
-        });
-        setFiles(fileObjects.slice(0, 1));
-      }
-    }
-
-    setState('selected');
-  };
-
-  const handleDragStart = (index) => (event) => {
-    if (!isFileReorderEnabled()) return;
-    dragSourceIndexRef.current = index;
-    setDraggingIndex(index);
-    setDragOverIndex(index);
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = 'move';
-      try {
-        event.dataTransfer.setData('text/plain', String(index));
-      } catch (e) {
-        // Some browsers might block setting data; ignore
-      }
-    }
-  };
-
-  const handleDragEnter = (index) => (event) => {
-    if (!isFileReorderEnabled() || dragSourceIndexRef.current === null) return;
-    event.preventDefault();
-    if (index !== dragOverIndex) {
-      setDragOverIndex(index);
-    }
-  };
-
-  const handleDragOver = (event) => {
-    if (!isFileReorderEnabled() || dragSourceIndexRef.current === null) return;
-    event.preventDefault();
-    if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = 'move';
-    }
-  };
-
-  const handleDrop = (index) => (event) => {
-    if (!isFileReorderEnabled() || dragSourceIndexRef.current === null) return;
-    event.preventDefault();
-    const sourceIndex = dragSourceIndexRef.current;
-    if (sourceIndex === index) {
-      handleDragEnd();
-      return;
-    }
-    setFiles(prevFiles => reorderFiles(prevFiles, sourceIndex, index));
-    handleDragEnd();
-  };
-
-  const handleDragEnd = () => {
-    dragSourceIndexRef.current = null;
-    setDraggingIndex(null);
-    setDragOverIndex(null);
-  };
-
-  const removeFile = (indexToRemove) => {
-    const fileToRemove = files[indexToRemove];
-    if (fileToRemove) {
-      window.URL.revokeObjectURL(fileToRemove.url);
-    }
-
-    const updatedFiles = files.filter((_, index) => index !== indexToRemove);
-    setFiles(updatedFiles);
-
-    if (updatedFiles.length === 0) {
-      setState('init');
-      setSupportedFormats([]);
-      setConvertFormat('');
-      setSelectedPages('');
-      setPdfPageCount(0);
-      setDraggingIndex(null);
-      setDragOverIndex(null);
-      dragSourceIndexRef.current = null;
-    }
-  };
-
-  const clearAllFiles = () => {
-    // Clean up blob URLs
-    files.forEach(file => {
-      window.URL.revokeObjectURL(file.url);
-    });
-    setFiles([]);
-    setState("init");
-    setSupportedFormats([]);
-    setConvertFormat('');
-    setSelectedPages('');
-    setPdfPageCount(0);
-    setDraggingIndex(null);
-    setDragOverIndex(null);
-    dragSourceIndexRef.current = null;
-  };
-
-  const addMoreFiles = () => {
-    document.getElementById('files').click();
-  };
-
-  const onSubmit = (event) => {
-    event.preventDefault();
-    if (files.length === 0) return false;
-
-    // Validation
-    if (activeTab === 'merge' && files.length < 2) {
-      alert(t('selectAtLeastTwoFiles'));
-      return false;
-    }
-
-    if (activeTab === 'split' && (!splitRange.startPage || !splitRange.endPage)) {
-      alert(t('specifyPageRange'));
-      return false;
-    }
-
-    if (activeTab === 'split') {
-      const startPage = parseInt(splitRange.startPage);
-      const endPage = parseInt(splitRange.endPage);
-      if (isNaN(startPage) || isNaN(endPage) || startPage < 1 || endPage < startPage) {
-        alert(t('validPageNumbers'));
-        return false;
-      }
-    }
-
-    if (activeTab === 'convert' && !convertFormat) {
-      alert('Please select a target format for conversion');
-      return false;
-    }
-
-    const primaryFilename = files[0]?.filename || 'output.pdf';
-    if (activeTab === 'parse') {
-      parsePDF(files);
-    } else if (activeTab === 'convert') {
-      convertFile(files, primaryFilename);
-    } else {
-      processPDF(activeTab, files, primaryFilename);
-    }
-    return false;
-  };
-
-  const resetForm = () => {
-    // Clean up blob URLs
-    files.forEach(file => {
-      window.URL.revokeObjectURL(file.url);
-    });
-    downloadLinks.forEach(link => {
-      window.URL.revokeObjectURL(link.url);
-    });
-
-    setFiles([]);
-    setDownloadLinks([]);
-    setState("init");
-    setSplitRange({ startPage: "", endPage: "" });
-    setErrorMessage("");
-    setTerminalData(""); // Clear terminal output
-    setProgressInfo({ current: 0, total: 0, currentPage: 0 }); // Reset progress
-    setUseAdvancedSettings(false);
-    setAdvancedSettings({
-      compatibilityLevel: "1.4",
-      colorImageSettings: {
-        downsample: true,
-        resolution: 300
-      }
-    });
-    // Reset convert feature state
-    setConvertFormat("");
-    setSupportedFormats([]);
-    setSelectedPages('');
-    setPdfPageCount(0);
-    setPdfUrl(null);
-    setFileInfo(null);
-    setDraggingIndex(null);
-    setDragOverIndex(null);
-    dragSourceIndexRef.current = null;
-  };
-
-  const processAgain = () => {
-    // Keep the files but reset to selected state
-    downloadLinks.forEach(link => {
-      window.URL.revokeObjectURL(link.url);
-    });
-    setDownloadLinks([]);
-    setState("selected");
-    setErrorMessage("");
-    setTerminalData(""); // Clear terminal output
-    setProgressInfo({ current: 0, total: 0, currentPage: 0 }); // Reset progress
-  };
-
-  const renderFileInput = () => {
-  const accept = activeTab === 'convert' ? "application/pdf,image/*,.jpg,.jpeg,.png,.bmp" : "application/pdf";
-  const multiple = activeTab === 'merge' || activeTab === 'convert';
-
-    return (
-      <div className="space-y-6">
-        <input
-          type="file"
-          accept={accept}
-          multiple={multiple}
-          name="files"
-          onChange={changeHandler}
-          id="files"
-          className="hidden"
-        />
-        <div className="text-center">
-          <label
-            htmlFor="files"
-            className="btn-primary cursor-pointer text-lg px-8 py-4 rounded-xl"
-          >
-            {files.length === 0
-              ? t('chooseFiles', { 
-                  count: multiple ? 's' : '', 
-                  operation: t(activeTab).toLowerCase() 
-                })
-              : t('filesSelected', { count: files.length })
-            }
-          </label>
-        </div>
-
-        {files.length > 0 && (
-          <div className="card">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-4">
-              <span className="text-sm font-medium text-muted-600 dark:text-muted-400">
-                {t('filesSelected', { count: files.length })}
-              </span>
-              <button
-                type="button"
-                className="btn-danger text-sm px-4 py-2 rounded-xl"
-                onClick={clearAllFiles}
-                title={t('clearAll')}
-              >
-                {t('clearAll')}
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {files.map((file, index) => {
-                const reorderEnabled = isFileReorderEnabled();
-                const isDraggingItem = draggingIndex === index;
-                const isDropTarget = dragOverIndex === index && draggingIndex !== null && draggingIndex !== index;
-                const baseClasses = "flex items-center justify-between p-4 bg-muted-50 dark:bg-gray-700 border border-muted-200 dark:border-gray-600 rounded-xl transition-all duration-150";
-                const dragClasses = reorderEnabled ? " cursor-grab active:cursor-grabbing" : "";
-                const highlightClasses = [
-                  isDraggingItem ? "opacity-75 ring-2 ring-primary-400" : "",
-                  isDropTarget ? "ring-2 ring-primary-500 bg-primary-50/60 dark:bg-primary-900/20" : ""
-                ].join(' ');
-
-                return (
-                  <div
-                    key={index}
-                    className={`${baseClasses}${dragClasses} ${highlightClasses}`.trim()}
-                    draggable={reorderEnabled}
-                    onDragStart={handleDragStart(index)}
-                    onDragEnter={handleDragEnter(index)}
-                    onDragOver={handleDragOver}
-                    onDrop={handleDrop(index)}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {reorderEnabled && (
-                          <span className="mr-2 text-xs font-semibold text-muted-500 dark:text-muted-300 select-none">
-                            {index + 1}.
-                          </span>
-                        )}
-                        {file.filename}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="ml-4 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-sm font-bold transition-all duration-200 hover:scale-110"
-                      onClick={() => removeFile(index)}
-                      title={t('removeFile')}
-                    >
-                      ×
-                    </button>
-                  </div>
-                );
-              })}
-
-              {isFileReorderEnabled() && (
-                <p className="text-xs text-muted-600 dark:text-muted-400 text-center">
-                  {t('dragToReorder')}
-                </p>
-              )}
-
-              {(activeTab === 'merge' || (activeTab === 'convert' && isImageReorderMode())) && (
-                <button
-                  type="button"
-                  className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-muted-300 dark:border-gray-600 rounded-xl text-muted-600 dark:text-muted-400 hover:border-muted-400 dark:hover:border-gray-500 hover:text-muted-700 dark:hover:text-muted-300 transition-colors"
-                  onClick={addMoreFiles}
-                >
-                  <span className="text-xl font-bold">+</span>
-                  {t('addMoreFiles')}
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderSettings = () => {
-    return (
-      <div className="card space-y-6">
-        {useCustomCommand ? (
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-gray-900 dark:text-white">
-              {t('customCommand')}
-            </label>
-            <input
-              type="text"
-              value={customCommand}
-              onChange={(e) => setCustomCommand(e.target.value)}
-              placeholder={t('customCommandPlaceholder')}
-              className="input font-mono text-sm"
-            />
-            <p className="text-xs text-muted-600 dark:text-muted-400">
-              {t('customCommandHelp')}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {(activeTab === 'compress' || activeTab === 'merge') && (
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-gray-900 dark:text-white">
-                  {t('pdfQualitySetting')}
-                </label>
-                <select
-                  value={pdfSetting}
-                  onChange={(e) => setPdfSetting(e.target.value)}
-                  className="input"
-                >
-                  {Object.entries(PDF_SETTINGS).map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-            {activeTab === 'split' && (
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-gray-900 dark:text-white">
-                  {t('pageRange')}
-                </label>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="number"
-                    placeholder={t('startPage')}
-                    value={splitRange.startPage}
-                    onChange={(e) => setSplitRange(prev => ({ ...prev, startPage: e.target.value }))}
-                    min="1"
-                    className="input flex-1"
-                  />
-                  <span className="text-muted-600 dark:text-muted-400 font-medium">{t('to')}</span>
-                  <input
-                    type="number"
-                    placeholder={t('endPage')}
-                    value={splitRange.endPage}
-                    onChange={(e) => setSplitRange(prev => ({ ...prev, endPage: e.target.value }))}
-                    min="1"
-                    className="input flex-1"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Show Terminal Output Toggle */}
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="showTerminalOutput"
-                checked={showTerminalOutput}
-                onChange={(e) => setShowTerminalOutput(e.target.checked)}
-                className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 focus:ring-2"
-              />
-              <label htmlFor="showTerminalOutput" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
-                {t('showTerminalOutput')}
-              </label>
-            </div>
-
-            {/* Show Progress Bar Toggle */}
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="showProgressBar"
-                checked={showProgressBar}
-                onChange={(e) => setShowProgressBar(e.target.checked)}
-                className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 focus:ring-2"
-              />
-              <label htmlFor="showProgressBar" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
-                {t('showProgressBar')}
-              </label>
-            </div>
-
-            {/* Advanced Settings Toggle */}
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="useAdvancedSettings"
-                checked={useAdvancedSettings}
-                onChange={(e) => setUseAdvancedSettings(e.target.checked)}
-                className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 focus:ring-2"
-              />
-              <label htmlFor="useAdvancedSettings" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
-                {t('useAdvancedSettings')}
-              </label>
-            </div>
-
-            {/* Page Selection for PDF to Image Conversion */}
-            {activeTab === 'convert' && convertFormat && ['jpg', 'jpeg', 'png', 'bmp'].includes(convertFormat) && files.length > 0 && isPdfFile(files[0]?.file) && (
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-gray-900 dark:text-white">
-                  {pdfPageCount > 0 ? `${t('selectPages')} (1-${pdfPageCount})` : t('pageSelectionLoading')}
-                </label>
-                <input
-                  type="text"
-                  placeholder={t('pageSelectionHint')}
-                  value={selectedPages}
-                  onChange={(e) => setSelectedPages(e.target.value)}
-                  className="input"
-                  disabled={pdfPageCount === 0}
-                />
-                <p className="text-xs text-muted-600 dark:text-muted-400">
-                  {t('pageSelectionHelp')}
-                </p>
-              </div>
-            )}
-
-            {/* Advanced Settings Panel */}
-            {useAdvancedSettings && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    id="downsampleImages"
-                    checked={advancedSettings.colorImageSettings.downsample}
-                    onChange={(e) => setAdvancedSettings(prev => ({
-                      ...prev,
-                      colorImageSettings: {
-                        ...prev.colorImageSettings,
-                        downsample: e.target.checked
-                      }
-                    }))}
-                    className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 focus:ring-2"
-                  />
-                  <label htmlFor="downsampleImages" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
-                    {t('downsampleImages')}
-                  </label>
-                </div>
-
-                {advancedSettings.colorImageSettings.downsample && (
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <label className="text-sm font-medium text-gray-900 dark:text-white">
-                      {t('colorImageResolution')}
-                    </label>
-                    <input
-                      type="number"
-                      value={advancedSettings.colorImageSettings.resolution}
-                      onChange={(e) => setAdvancedSettings(prev => ({
-                        ...prev,
-                        colorImageSettings: {
-                          ...prev.colorImageSettings,
-                          resolution: parseInt(e.target.value) || 300
-                        }
-                      }))}
-                      min="72"
-                      max="1200"
-                      className="input sm:w-32"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-          </div>
-        )}
-
-      </div>
-    );
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-muted-50 to-muted-100 dark:from-gray-900 dark:to-gray-800">
