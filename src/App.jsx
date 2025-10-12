@@ -1,7 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import * as pdfjsLib from 'pdfjs-dist';
 import { useTranslation } from 'react-i18next';
-import { _GSPS2PDF } from "./lib/worker-init.js";
+import PdfPreview from './components/pdf/PdfPreview.jsx';
+import ProgressBar from './components/common/ProgressBar.jsx';
+import TerminalOutput from './components/common/TerminalOutput.jsx';
+import { isPdfFile, isImageFile, parsePageSelection, reorderFiles } from './utils/pdf.js';
+import { processWithGS } from './services/pdfService.js';
+import { createPdfWithMultipleImages } from './services/imagePdf.js';
+// import { _GSPS2PDF } from "./lib/worker-init.js"; // moved to services
 import RightButtonBar from './components/RightButtonBar.jsx';
 
 function loadPDFData(response, filename) {
@@ -120,269 +126,7 @@ function App() {
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const dragSourceIndexRef = useRef(null);
 
-  // PDF Preview component for converted PDFs
-  const PdfPreview = ({ url }) => {
-    const [pdfDoc, setPdfDoc] = useState(null);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(0);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [renderReady, setRenderReady] = useState(false);
-    const canvasRef = useRef(null);
-    const previewContainerRef = useRef(null);
-    const mountedRef = useRef(true);
-
-    // Cleanup on unmount
-    useEffect(() => {
-      mountedRef.current = true;
-      return () => {
-        mountedRef.current = false;
-      };
-    }, []);
-
-    useEffect(() => {
-      if (!url) {
-        setLoading(false);
-        return;
-      }
-
-      const loadPdf = async () => {
-        try {
-          if (!mountedRef.current) return;
-          
-          setLoading(true);
-          setError(null);
-          setRenderReady(false);
-          
-          // Configure worker for pdfjs - simplified approach
-          try {
-            if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-              try {
-                pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString();
-              } catch (e) {
-                pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-              }
-            }
-          } catch (e) {
-            console.warn('Worker configuration skipped:', e);
-          }
-
-          // Load the PDF document with optimized options
-          const loadingTask = pdfjsLib.getDocument({
-            url: url,
-            disableAutoFetch: true,  // Faster initial load
-            disableStream: true,     // Better for small PDFs
-            enableXfa: false,
-            ignoreErrors: true
-          });
-          
-          const pdf = await loadingTask.promise;
-          
-          if (!mountedRef.current) return;
-          
-          setPdfDoc(pdf);
-          setTotalPages(pdf.numPages);
-          setCurrentPage(1);
-          setLoading(false);
-          
-          // Signal that we're ready to render
-          setTimeout(() => {
-            if (mountedRef.current) {
-              setRenderReady(true);
-            }
-          }, 100);
-        } catch (error) {
-          console.error('Error loading PDF for preview:', error);
-          if (mountedRef.current) {
-            setError(error.message || 'Failed to load PDF');
-            setLoading(false);
-          }
-        }
-      };
-
-      loadPdf();
-    }, [url]);
-
-    useEffect(() => {
-      if (!pdfDoc || !renderReady) return;
-
-      const renderPage = async () => {
-        try {
-          if (!mountedRef.current) return;
-          
-          setLoading(true);
-          setError(null);
-
-          // Wait a bit for the DOM to be ready
-          await new Promise(resolve => setTimeout(resolve, 50));
-          
-          if (!mountedRef.current) return;
-
-          // Get the canvas element
-          const canvas = canvasRef.current;
-          if (!canvas) {
-            console.warn('Canvas ref not available yet');
-            return;
-          }
-
-          // Ensure canvas is in DOM
-          if (!document.contains(canvas)) {
-            console.warn('Canvas not in DOM yet');
-            return;
-          }
-
-          const page = await pdfDoc.getPage(currentPage);
-          const viewportBase = page.getViewport({ scale: 1 });
-          
-          // Calculate container width with fallback
-          let containerWidth = 600; // Default width
-          if (previewContainerRef.current) {
-            const measured = previewContainerRef.current.clientWidth || 
-                           previewContainerRef.current.offsetWidth;
-            if (measured > 0) {
-              containerWidth = measured;
-            }
-          }
-          
-          // Calculate scale with reasonable bounds
-          const scale = Math.max(0.5, Math.min(containerWidth / viewportBase.width, 2.5));
-          const viewport = page.getViewport({ scale });
-
-          // Get canvas context
-          const ctx = canvas.getContext('2d', { alpha: false });
-          if (!ctx) {
-            throw new Error('Failed to get canvas 2D context');
-          }
-          
-          // Set canvas dimensions
-          canvas.width = Math.floor(viewport.width);
-          canvas.height = Math.floor(viewport.height);
-          
-          // Clear canvas before rendering
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-          const renderContext = {
-            canvasContext: ctx,
-            viewport: viewport,
-            enableWebGL: false,
-            renderInteractiveForms: false,
-            intent: 'display'
-          };
-
-          // Render with timeout protection
-          const renderPromise = page.render(renderContext).promise;
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Render timeout')), 15000);
-          });
-
-          await Promise.race([renderPromise, timeoutPromise]);
-          
-          if (mountedRef.current) {
-            setLoading(false);
-          }
-        } catch (error) {
-          console.error('Error rendering PDF page:', error);
-          if (mountedRef.current) {
-            setError('Failed to render PDF page');
-            setLoading(false);
-          }
-        }
-      };
-
-      renderPage();
-    }, [pdfDoc, currentPage, renderReady]);
-
-    const goToPrevPage = () => {
-      if (currentPage > 1) {
-        setCurrentPage(prev => prev - 1);
-      }
-    };
-
-    const goToNextPage = () => {
-      if (currentPage < totalPages) {
-        setCurrentPage(prev => prev + 1);
-      }
-    };
-
-    if (!url) {
-      return (
-        <div className="text-center py-8">
-          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-            <span className="text-2xl font-bold text-gray-600 dark:text-gray-400">PDF</span>
-          </div>
-          <p className="text-muted-600 dark:text-muted-400">
-            No PDF available for preview
-          </p>
-        </div>
-      );
-    }
-
-    if (loading && !renderReady) {
-      return (
-        <div className="text-center py-8">
-          <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
-          </div>
-          <p className="text-muted-600 dark:text-muted-400">
-            Loading PDF...
-          </p>
-        </div>
-      );
-    }
-
-    if (error) {
-      return (
-        <div className="text-center py-8">
-          <div className="w-16 h-16 mx-auto mb-4 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
-            <span className="text-2xl font-bold text-red-600 dark:text-red-400">!</span>
-          </div>
-          <p className="text-muted-600 dark:text-muted-400">
-            {error}
-          </p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-4 w-full">
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between">
-            <button
-              onClick={goToPrevPage}
-              disabled={currentPage <= 1}
-              className="btn-secondary px-3 py-1.5 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {t('prev')}
-            </button>
-            <span className="text-sm text-muted-600 dark:text-muted-400">
-              {t('page')} {currentPage} / {totalPages}
-            </span>
-            <button
-              onClick={goToNextPage}
-              disabled={currentPage >= totalPages}
-              className="btn-secondary px-3 py-1.5 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {t('next')}
-            </button>
-          </div>
-        )}
-        
-        <div ref={previewContainerRef} className="w-full bg-white dark:bg-gray-900 p-4 rounded-lg flex items-center justify-center">
-          <canvas 
-            ref={canvasRef} 
-            className="max-w-full h-auto shadow-lg"
-            style={{ display: 'block' }}
-          />
-        </div>
-        
-        {loading && (
-          <div className="text-center py-2">
-            <span className="text-sm text-muted-600 dark:text-muted-400">Rendering...</span>
-          </div>
-        )}
-      </div>
-    );
-  };
+  // PdfPreview extracted to src/components/pdf/PdfPreview.jsx
 
   // Auto-scroll terminal output to bottom
   useEffect(() => {
@@ -438,19 +182,16 @@ function App() {
         dataObject.psDataURL = inputFiles[0].url;
       }
 
-      const result = await _GSPS2PDF(
+      const result = await processWithGS(
         dataObject,
-        null, // responseCallback (not used in promise version)
         (showTerminalOutput || showProgressBar) ? (outputText) => {
-          // Update terminal output if enabled
           if (showTerminalOutput) {
             setTerminalData(prev => prev + outputText + '\n');
           }
-          // Parse progress information if progress bar is enabled
           if (showProgressBar) {
             parseProgressFromOutput(outputText);
           }
-        } : null // outputCallback
+        } : null
       );
 
       // Check for errors in the result
@@ -759,54 +500,11 @@ function App() {
     }
   }
 
-  // Helper function to parse page ranges like "1,3-5,7"
-  function parsePageSelection(selection, totalPages) {
-    if (!selection || selection.trim() === '') {
-      // If no selection, return all pages
-      return Array.from({ length: totalPages }, (_, i) => i + 1);
-    }
-    
-    const pages = new Set();
-    const parts = selection.split(',');
-    
-    for (const part of parts) {
-      const trimmed = part.trim();
-      if (!trimmed) continue;
-      
-      // Check if it's a range (e.g., 3-5)
-      const rangeMatch = trimmed.match(/^(\d+)-(\d+)$/);
-      if (rangeMatch) {
-        const start = parseInt(rangeMatch[1]);
-        const end = parseInt(rangeMatch[2]);
-        
-        if (!isNaN(start) && !isNaN(end) && start <= end && start >= 1 && end <= totalPages) {
-          for (let i = start; i <= end; i++) {
-            pages.add(i);
-          }
-        }
-      } else {
-        // Check if it's a single page
-        const pageNum = parseInt(trimmed);
-        if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= totalPages) {
-          pages.add(pageNum);
-        }
-      }
-    }
-    
-    return Array.from(pages).sort((a, b) => a - b);
-  }
+  // parsePageSelection 已提取到 utils/pdf.js
 
-  const isPdfFile = (file) => {
-    if (!file) return false;
-    const name = file.name?.toLowerCase() || '';
-    return file.type === 'application/pdf' || name.endsWith('.pdf');
-  };
+  // isPdfFile 已提取到 utils/pdf.js
 
-  const isImageFile = (file) => {
-    if (!file) return false;
-    if (file.type?.startsWith('image/')) return true;
-    return /\.(jpg|jpeg|png|bmp)$/i.test(file.name || '');
-  };
+  // isImageFile 已提取到 utils/pdf.js
 
   const loadPdfPageCount = async (file) => {
     try {
@@ -830,12 +528,7 @@ function App() {
     }
   };
 
-  const reorderFiles = (list, startIndex, endIndex) => {
-    const updated = [...list];
-    const [removed] = updated.splice(startIndex, 1);
-    updated.splice(endIndex, 0, removed);
-    return updated;
-  };
+  // reorderFiles 已提取到 utils/pdf.js
 
   const isImageReorderMode = () => (
     activeTab === 'convert' && files.length > 1 && files.every(item => isImageFile(item.file))
@@ -969,80 +662,7 @@ function App() {
     }
   }
 
-  // Helper function to create a PDF with multiple images
-  async function createPdfWithMultipleImages(inputFiles) {
-    if (!inputFiles || inputFiles.length === 0) {
-      throw new Error('No images supplied for PDF generation');
-    }
-
-    try {
-      const { jsPDF } = await import('jspdf');
-
-      const imageEntries = [];
-
-      // Preload all images to gather dimensions
-      for (let i = 0; i < inputFiles.length; i++) {
-        const file = inputFiles[i].file;
-        const dataUrl = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-
-        const dimensions = await new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => resolve({ width: img.width, height: img.height });
-          img.onerror = reject;
-          img.src = dataUrl;
-        });
-
-        imageEntries.push({
-          file,
-          dataUrl,
-          width: dimensions.width,
-          height: dimensions.height
-        });
-      }
-
-      const maxWidth = Math.max(...imageEntries.map((img) => img.width), 1);
-      const maxHeight = Math.max(...imageEntries.map((img) => img.height), 1);
-
-      const orientation = maxWidth >= maxHeight ? 'landscape' : 'portrait';
-      const doc = new jsPDF({
-        orientation,
-        unit: 'px',
-        format: [maxWidth, maxHeight]
-      });
-
-      setProgressInfo({ current: 0, total: imageEntries.length, currentPage: 0 });
-
-      for (let i = 0; i < imageEntries.length; i++) {
-        const { file, dataUrl, width, height } = imageEntries[i];
-
-        if (i > 0) {
-          doc.addPage([maxWidth, maxHeight], orientation);
-        }
-
-        const scale = Math.min(maxWidth / width, maxHeight / height);
-        const scaledWidth = width * scale;
-        const scaledHeight = height * scale;
-        const offsetX = (maxWidth - scaledWidth) / 2;
-        const offsetY = (maxHeight - scaledHeight) / 2;
-
-        const imageFormat = file.type.includes('png') ? 'PNG' : 'JPEG';
-
-        doc.addImage(dataUrl, imageFormat, offsetX, offsetY, scaledWidth, scaledHeight, undefined, 'FAST');
-
-        setProgressInfo({ current: i + 1, total: imageEntries.length, currentPage: 0 });
-      }
-
-      return doc.output('arraybuffer');
-    } catch (error) {
-      console.error('Error creating PDF from multiple images:', error);
-      throw error;
-    }
-  }
+  // 图片转 PDF 功能已提取到 services/imagePdf.js
 
   const changeHandler = async (event) => {
     const selectedFiles = Array.from(event.target.files);
@@ -1805,38 +1425,13 @@ function App() {
             </p>
 
             {/* Progress Bar */}
-            {showProgressBar && (progressInfo.total > 0 || progressInfo.currentPage > 0) && (
-              <>
-                {progressInfo.total > 0 ? (
-                  <>
-                    <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-3 mb-2">
-                      <div
-                        className="bg-primary-600 h-3 rounded-full transition-all duration-300 ease-out"
-                        style={{ width: `${(progressInfo.current / progressInfo.total) * 100}%` }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between text-xs text-muted-600 dark:text-muted-400">
-                      <span>{t('percentComplete', { percent: Math.round((progressInfo.current / progressInfo.total) * 100) })}</span>
-                      <span>{t('pagesProgress', { current: progressInfo.current, total: progressInfo.total })}</span>
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex items-center justify-center py-2">
-                    <div className="animate-pulse text-sm text-muted-600 dark:text-muted-400">
-                      {t('processingPage', { page: progressInfo.currentPage })}
-                    </div>
-                  </div>
-                )}
-              </>
+            {showProgressBar && (
+              <ProgressBar progressInfo={progressInfo} t={t} />
             )}
 
             {/* Terminal Output Display */}
             {showTerminalOutput && (
-              <div ref={terminalRef} className="bg-black dark:bg-gray-900 rounded-lg p-3 max-h-32 overflow-y-auto">
-                <pre className="text-xs text-green-400 font-mono whitespace-pre-wrap break-words">
-                  {terminalData || t('initializing')}
-                </pre>
-              </div>
+              <TerminalOutput ref={terminalRef} terminalData={terminalData} t={t} />
             )}
           </div>
         )}
@@ -2010,7 +1605,7 @@ function App() {
                           />
                         ) : link.filename.endsWith('.pdf') ? (
                           <div className="w-full min-h-[400px]">
-                            <PdfPreview url={link.url} />
+                            <PdfPreview url={link.url} t={t} />
                           </div>
                         ) : null}
                         
