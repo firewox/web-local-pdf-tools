@@ -9,7 +9,7 @@ export default function ErrorPanel({ t, errorMessage, onTryAgain }) {
           </pre>
         </div>
       </div>
-      <button onClick={onTryAgain} className="btn-danger">
+      <button onClick={onTryAgain} className="btn-danger rounded-lg px-6 py-2 hover:shadow-lg transition-all duration-200">
         {t('tryAgain')}
       </button>
     </div>

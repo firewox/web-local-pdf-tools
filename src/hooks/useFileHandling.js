@@ -237,8 +237,8 @@ export const useFileHandling = ({
       if (pdfFiles.length && imageFiles.length) {
         errorMessage = t('mixedConvertTypesNotSupported');
       } else if (pdfFiles.length) {
-        if (pdfFiles.length > 1 || canAppend) {
-          errorMessage = t('selectFileToConvert');
+        if (pdfFiles.length > 1) {
+          errorMessage = t('multiplePdfsNotSupported');
         } else {
           const pdfFile = pdfFiles[0];
           const record = buildFileRecord(pdfFile);

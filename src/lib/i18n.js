@@ -112,6 +112,7 @@ const resources = {
   "dragToReorder": "Drag files to adjust their order",
   "invalidPageSelection": "Please enter page numbers that exist in the document.",
   "mixedConvertTypesNotSupported": "Please select either a PDF or image files, not both at the same time.",
+  "multiplePdfsNotSupported": "Please select only one PDF file for conversion to images.",
   "unsupportedConvertType": "Unsupported file type selected for conversion.",
       
       // Privacy section
@@ -239,6 +240,7 @@ const resources = {
   "dragToReorder": "拖动文件可调整顺序",
   "invalidPageSelection": "请输入文档范围内的有效页码。",
   "mixedConvertTypesNotSupported": "请选择单个 PDF 或一组图片，不能同时选择两种类型。",
+  "multiplePdfsNotSupported": "PDF转图片时只能选择一个PDF文件，不能选择多个PDF文件。",
   "unsupportedConvertType": "包含不支持转换的文件类型。",
       
       // Privacy section
