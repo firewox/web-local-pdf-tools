@@ -3,7 +3,6 @@ export default function SettingsPanel({
   useCustomCommand,
   customCommand,
   setCustomCommand,
-  PDF_SETTINGS,
   activeTab,
   pdfSetting,
   setPdfSetting,
@@ -23,6 +22,7 @@ export default function SettingsPanel({
   setSelectedPages,
   pdfPageCount,
   isPdfSelected,
+  PDF_SETTINGS,
 }) {
   return (
     <div className="card space-y-6">

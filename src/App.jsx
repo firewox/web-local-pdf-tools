@@ -1,7 +1,7 @@
 import { useRef, useEffect } from "react";
 import * as pdfjsLib from 'pdfjs-dist';
 import { useTranslation } from 'react-i18next';
-import { PDF_SETTINGS, isPdfFile, isImageFile } from './utils/pdf.js';
+import { isPdfFile, isImageFile } from './utils/pdf.js';
 
 // Custom Hooks
 import { useAppState } from './hooks/useAppState';
@@ -29,6 +29,14 @@ import ActionSubmit from './components/common/ActionSubmit.jsx';
 function App() {
   const { t } = useTranslation();
   const terminalRef = useRef(null);
+
+  const PDF_SETTINGS = {
+    screen: t('pdfSettingScreen'),
+    ebook: t('pdfSettingEbook'),
+    printer: t('pdfSettingPrinter'),
+    prepress: t('pdfSettingPrepress'),
+    default: t('pdfSettingDefault'),
+  };
 
   const {
     activeTab,
@@ -65,9 +73,11 @@ function App() {
     advancedSettings,
     setAdvancedSettings,
     useAdvancedSettings,
+    setUseAdvancedSettings,
     convertFormat,
     setConvertFormat,
     supportedFormats,
+    setSupportedFormats,
     selectedPages,
     setSelectedPages,
     pdfPageCount,
@@ -76,6 +86,7 @@ function App() {
 
   const {
     parsedPages,
+    setParsedPages,
     currentParsedPage,
     setCurrentParsedPage,
     pdfDocRef,
@@ -84,6 +95,7 @@ function App() {
     previewContainerRef,
     rightTextRef,
     parsedPageItems,
+    setParsedPageItems,
     highlightMap,
     setHighlightMap,
   } = usePdfParse();
@@ -100,7 +112,18 @@ function App() {
     clearAllFiles,
     addMoreFiles,
     changeHandler,
-  } = useFileHandling(files, setFiles, activeTab, setState, setErrorMessage, t);
+  } = useFileHandling({
+    files,
+    setFiles,
+    activeTab,
+    setState,
+    setErrorMessage,
+    t,
+    setSupportedFormats,
+    setConvertFormat,
+    setSelectedPages,
+    setPdfPageCount,
+  });
 
   const {
     onSubmit,
@@ -111,20 +134,30 @@ function App() {
     setFiles,
     activeTab,
     customCommand,
+    setCustomCommand,
     useCustomCommand,
+    setUseCustomCommand,
     pdfSetting,
     splitRange,
     advancedSettings,
     useAdvancedSettings,
+    setUseAdvancedSettings,
     convertFormat,
+    setConvertFormat,
+    setSupportedFormats,
     selectedPages,
+    setSelectedPages,
     setState,
     setErrorMessage,
     setDownloadLinks,
     setTerminalData,
     setProgressInfo,
-    setParsedPages: (pages) => usePdfParse().setParsedPages(pages),
-    setParsedPageItems: (items) => usePdfParse().setParsedPageItems(items),
+    setParsedPages,
+    setParsedPageItems,
+    setCurrentParsedPage,
+    setPdfPageCount,
+    showTerminalOutput,
+    showProgressBar,
     pdfDocRef,
     t,
   });

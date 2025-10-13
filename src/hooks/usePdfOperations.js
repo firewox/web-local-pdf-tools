@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { processWithGS } from '../services/pdfService.js';
 import { createPdfWithMultipleImages } from '../services/imagePdf.js';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -62,6 +63,25 @@ function loadPDFData(response, filename) {
  * @returns {object} 包含 PDF 操作函数的对象
  */
 export const usePdfOperations = ({
+  files,
+  setFiles,
+  activeTab,
+  customCommand,
+  setCustomCommand,
+  useCustomCommand,
+  setUseCustomCommand,
+  pdfSetting,
+  splitRange,
+  advancedSettings,
+  useAdvancedSettings,
+  setUseAdvancedSettings,
+  convertFormat,
+  setConvertFormat,
+  setSupportedFormats,
+  selectedPages,
+  setSelectedPages,
+  showTerminalOutput,
+  showProgressBar,
   setState,
   setTerminalData,
   setProgressInfo,
@@ -70,18 +90,8 @@ export const usePdfOperations = ({
   setParsedPages,
   setParsedPageItems,
   setCurrentParsedPage,
+  setPdfPageCount,
   pdfDocRef,
-  activeTab,
-  useCustomCommand,
-  pdfSetting,
-  customCommand,
-  useAdvancedSettings,
-  advancedSettings,
-  showTerminalOutput,
-  showProgressBar,
-  convertFormat,
-  splitRange,
-  selectedPages,
   t,
 }) => {
 
@@ -107,6 +117,7 @@ export const usePdfOperations = ({
     }
   };
 
+
   /**
    * @description 处理 PDF
    * @param {string} operation - 操作类型
@@ -114,6 +125,7 @@ export const usePdfOperations = ({
    * @param {string} filename - 文件名
    */
   async function processPDF(operation, inputFiles, filename) {
+    setDownloadLinks([]);
     setState('loading');
     setTerminalData('');
     setProgressInfo({ current: 0, total: 0, currentPage: 0 });
@@ -195,6 +207,7 @@ export const usePdfOperations = ({
    * @param {string} filename - 文件名
    */
   async function convertFile(inputFiles, filename) {
+    setDownloadLinks([]);
     setState('loading');
     setTerminalData('');
     setProgressInfo({ current: 0, total: 0, currentPage: 0 });
@@ -299,6 +312,11 @@ export const usePdfOperations = ({
    */
   async function parsePDF(files) {
     try {
+      setDownloadLinks([]);
+      setState('loading');
+      setTerminalData('');
+      setProgressInfo({ current: 0, total: 0, currentPage: 0 });
+
       const file = files[0]?.file;
       if (!file) return;
 
@@ -368,5 +386,147 @@ export const usePdfOperations = ({
     }
   }
 
-  return { processPDF, convertFile, parsePDF, getOutputFilename };
+  const resetParsedState = useCallback(() => {
+    setParsedPages([]);
+    setParsedPageItems([]);
+    setCurrentParsedPage(1);
+    if (pdfDocRef?.current) {
+      pdfDocRef.current = null;
+    }
+  }, [setParsedPages, setParsedPageItems, setCurrentParsedPage, pdfDocRef]);
+
+  const resetForm = useCallback(() => {
+    files?.forEach(entry => {
+      if (entry?.url) {
+        try {
+          window.URL.revokeObjectURL(entry.url);
+        } catch {
+          // Ignore revoke failures
+        }
+      }
+    });
+
+    setFiles([]);
+    setState('init');
+    setErrorMessage('');
+    setDownloadLinks([]);
+    setTerminalData('');
+    setProgressInfo({ current: 0, total: 0, currentPage: 0 });
+    resetParsedState();
+    setSelectedPages?.('');
+    setPdfPageCount?.(0);
+    setConvertFormat?.('');
+    setSupportedFormats?.([]);
+    setUseAdvancedSettings?.(false);
+    setUseCustomCommand?.(false);
+    setCustomCommand?.('');
+  }, [
+    files,
+    setFiles,
+    setState,
+    setErrorMessage,
+    setDownloadLinks,
+    setTerminalData,
+    setProgressInfo,
+    resetParsedState,
+    setSelectedPages,
+    setPdfPageCount,
+    setConvertFormat,
+    setSupportedFormats,
+    setUseAdvancedSettings,
+    setUseCustomCommand,
+    setCustomCommand,
+  ]);
+
+  const validateBeforeProcess = useCallback(() => {
+    if (!files || files.length === 0) {
+      setErrorMessage(t('selectFileToConvert'));
+      setState('error');
+      return false;
+    }
+
+    if (useCustomCommand) {
+      if (!customCommand?.trim()) {
+        setErrorMessage(t('enterCustomCommand'));
+        setState('error');
+        return false;
+      }
+
+      const trimmed = customCommand.trim();
+      if (!/-sDEVICE=/.test(trimmed) || !/-sOutputFile=/.test(trimmed)) {
+        setErrorMessage(t('customCommandRequired'));
+        setState('error');
+        return false;
+      }
+    }
+
+    if (activeTab === 'merge' && files.length < 2) {
+      setErrorMessage(t('selectAtLeastTwoFiles'));
+      setState('error');
+      return false;
+    }
+
+    if (activeTab === 'split') {
+      const { startPage, endPage } = splitRange || {};
+      if (!startPage || !endPage) {
+        setErrorMessage(t('specifyPageRange'));
+        setState('error');
+        return false;
+      }
+
+      const start = Number(startPage);
+      const end = Number(endPage);
+      if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end < start) {
+        setErrorMessage(t('validPageNumbers'));
+        setState('error');
+        return false;
+      }
+    }
+
+    if (activeTab === 'convert' && !convertFormat) {
+      setErrorMessage(t('selectFileToConvert'));
+      setState('error');
+      return false;
+    }
+
+    setErrorMessage('');
+    return true;
+  }, [files, activeTab, useCustomCommand, customCommand, splitRange, convertFormat, setErrorMessage, setState, t]);
+
+  const executeOperation = useCallback(async () => {
+    if (!validateBeforeProcess()) {
+      return;
+    }
+
+    const primary = files[0];
+    const baseFilename = primary?.filename || primary?.file?.name || 'output.pdf';
+
+    switch (activeTab) {
+      case 'compress':
+      case 'merge':
+      case 'split':
+        await processPDF(activeTab, files, baseFilename);
+        break;
+      case 'convert':
+        await convertFile(files, baseFilename);
+        break;
+      case 'parse':
+        await parsePDF(files);
+        break;
+      default:
+        break;
+    }
+  }, [activeTab, files, validateBeforeProcess, processPDF, convertFile, parsePDF]);
+
+  const onSubmit = useCallback(async (event) => {
+    event?.preventDefault?.();
+    await executeOperation();
+  }, [executeOperation]);
+
+  const processAgain = useCallback(async () => {
+    if (!files || files.length === 0) return;
+    await executeOperation();
+  }, [files, executeOperation]);
+
+  return { onSubmit, resetForm, processAgain };
 };
