@@ -17,9 +17,18 @@
 
 告别传统PDF软件的繁琐和臃肿（再见了，WPS、Microsoft Office 和 Adobe Acrobat 👋），我们追求轻量优雅的工具哲学。不需要安装，不强制订阅，没有弹窗干扰 - 这正是现代工具应有的模样。让我们用技术的力量，重新定义PDF处理工具的简约之美。🚀
 
-## Web Worker
+### 界面预览
+1. PDF拆分界面
+![PDF拆分](./lib/application_page.png)
+2. PDF解析界面
+![PDF解析](./lib/extract_from_pdf.png)
 
-压缩现在在web worker中处理，这样主线程不会变得无响应，现在对可以压缩的PDF大小几乎没有限制 :tada:
+## 一键使用
+### windows 用户：
+1. 下载 [最新版本](https://github.com/firewox/web-local-pdf-tools/releases/tag/v1.1.0) 的 `web-local-pdf-tools.v1.1.0.windows.zip` 文件。
+2. 解压文件到您选择的目录。
+3. 双击 `web-local-pdf-tools.exe` 打开应用程序；默认在本地机器开启端口为 5000 的 web 服务，路径为：` http://localhost:5000/web-local-pdf-tools/`。
+4. 开始使用！
 
 ## 运行项目
 

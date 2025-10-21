@@ -141,3 +141,20 @@ App.jsx 中的代码还是太多了，代码有 1700 多行，我需要将代码
 在文件转换功能中，pdf转图片时，如果用户选择多个pdf文件时，提示用户只能选择一个PDF文件；现在只实现了这样的提示，“处理您的 PDF 时发生错误：选择要转换的文件 重试”，应该提示用户只能选择一个PDF文件，不能选择多个PDF文件；
 # bugFix
 “重试”的button给个圆角的button，样式好一点。
+
+# Modify:Readme.md
+将以下内容翻译为英文，使用 ```md ```包裹输出
+<内容>
+## 界面预览
+1. PDF拆分界面
+![PDF拆分](./lib/application_page.png)
+2. PDF解析界面
+![PDF解析](./lib/extract_from_pdf.png)
+
+## 一键使用
+### windows 用户：
+1. 下载 [最新版本](https://github.com/firewox/web-local-pdf-tools/releases/tag/v1.1.0) 的 `web-local-pdf-tools.v1.1.0.windows.zip` 文件。
+2. 解压文件到您选择的目录。
+3. 双击 `web-local-pdf-tools.exe` 打开应用程序；默认在本地机器开启端口为 5000 的 web 服务，路径为：` http://localhost:5000/web-local-pdf-tools/`。
+4. 开始使用！
+</内容>
