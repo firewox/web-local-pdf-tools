@@ -86,7 +86,21 @@ function validateArgs(args, operation) {
   return true;
 }
 
+let wasmUrl = null;
 function loadScript() {
+  try {
+    // Resolve wasm asset URL via Vite bundling
+    wasmUrl = new URL('./gs-worker.wasm', import.meta.url).toString();
+  } catch (e) {
+    // Fallback: base path public location
+    wasmUrl = `${location.origin}/web-local-pdf-tools/gs-worker.wasm`;
+  }
+  // Hint to emscripten loader to find wasm from our resolved URL
+  self.Module = self.Module || {};
+  self.Module.locateFile = (path /*, dir*/ ) => {
+    if (path === 'gs-worker.wasm') return wasmUrl;
+    return path;
+  };
   import("./gs-worker.js");
 }
 
@@ -173,9 +187,12 @@ function _GSPS2PDF(
             function () {
               try {
                 var uarray = self.Module.FS.readFile("output.pdf", { encoding: "binary" });
-                var blob = new Blob([uarray], { type: "application/octet-stream" });
+                // Provide ArrayBuffer to main thread to avoid cross-context blob URL issues
+                var pdfArrayBuffer = uarray.buffer;
+                // Keep pdfDataURL for backward compatibility, but main thread should prefer buffer
+                var blob = new Blob([uarray], { type: "application/pdf" });
                 var pdfDataURL = self.URL.createObjectURL(blob);
-                responseCallback({ pdfDataURL: pdfDataURL, url: dataStruct.url });
+                responseCallback({ pdfArrayBuffer: pdfArrayBuffer, pdfDataURL: pdfDataURL, url: dataStruct.url });
                 
                 // Cleanup filesystem
                 try {
@@ -313,9 +330,10 @@ function _GSMergePDF(dataStruct, responseCallback) {
                 function () {
                   try {
                     var uarray = self.Module.FS.readFile("output.pdf", { encoding: "binary" });
-                    var blob = new Blob([uarray], { type: "application/octet-stream" });
+                    var pdfArrayBuffer = uarray.buffer;
+                    var blob = new Blob([uarray], { type: "application/pdf" });
                     var pdfDataURL = self.URL.createObjectURL(blob);
-                    responseCallback({ pdfDataURL: pdfDataURL, operation: 'merge' });
+                    responseCallback({ pdfArrayBuffer: pdfArrayBuffer, pdfDataURL: pdfDataURL, operation: 'merge' });
                     
                     // Cleanup filesystem
                     try {
@@ -453,9 +471,10 @@ function _GSSplitPDF(dataStruct, responseCallback) {
             function () {
               try {
                 var uarray = self.Module.FS.readFile("output.pdf", { encoding: "binary" });
-                var blob = new Blob([uarray], { type: "application/octet-stream" });
+                var pdfArrayBuffer = uarray.buffer;
+                var blob = new Blob([uarray], { type: "application/pdf" });
                 var pdfDataURL = self.URL.createObjectURL(blob);
-                responseCallback({ pdfDataURL: pdfDataURL, operation: 'split' });
+                responseCallback({ pdfArrayBuffer: pdfArrayBuffer, pdfDataURL: pdfDataURL, operation: 'split' });
                 
                 // Cleanup filesystem
                 try {

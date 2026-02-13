@@ -8,6 +8,7 @@ This is a PDF processing tool that runs entirely in your browser. It provides th
 - **Compress PDF**: Reduce PDF file size while maintaining quality.
 - **Parse PDF**: Extract text content from PDF documents.
 - **Advanced Parse PDF**: Use OCR to extract images, metadata, and other structured information.
+- **File Conversion**: Convert PDF to other formats (e.g., JPG, PNG, JPEG, BMP) and convert images to PDF.
 
 ## Context
 
@@ -15,9 +16,18 @@ This project is a PDF processing tool based on modern Web technology, focused on
 
 Say goodbye to the complexity and bloat of traditional PDF software (goodbye, WPS, Microsoft Office, and Adobe Acrobat 👋), we pursue a lightweight and elegant tool philosophy. No installation required, no forced subscriptions, no popup distractions - this is what modern tools should look like. Let's use the power of technology to redefine the minimalist beauty of PDF processing tools. 🚀
 
-## Web Worker
+## Interface Preview
+1. PDF Split Interface
+![PDF Split](./lib/application_page.png)
+2. PDF Parse Interface
+![PDF Parse](./lib/extract_from_pdf.png)
 
-The compression is now processed in a web worker so that the main thread doesn't become unresponsive and now there is virtually no limit to the size of the PDF that you can compress :tada:
+## One-Click Usage
+### For Windows Users:
+1. Download the [latest version](https://github.com/firewox/web-local-pdf-tools/releases/tag/v1.1.0) of the `web-local-pdf-tools.v1.1.0.windows.zip` file.
+2. Extract the file to your chosen directory.
+3. Double-click `web-local-pdf-tools.exe` to open the application; it will automatically start a web service on port 5000 on your local machine, accessible at: `http://localhost:5000/web-local-pdf-tools/`.
+4. Start using it!
 
 ## Run the project
 
@@ -53,7 +63,7 @@ npm run preview
 ### Merge PDF
 - [x] Combine multiple PDF files into one
 - [x] Quality settings for output optimization
-- [ ] Drag-and-drop interface for file selection
+- [x] Drag-and-drop interface for file selection
 
 ### Compress PDF
 - [x] Multiple quality presets (Screen, eBook, Printer, Prepress, Default)
@@ -64,6 +74,11 @@ npm run preview
 
 ### Advanced Parse PDF
 - [ ] Use OCR to extract images, metadata, and other structured information
+
+### File Conversion
+- [x] Convert PDF to JPG, PNG, JPEG, BMP
+- [x] Convert JPG, PNG, JPEG, BMP to PDF
+- [x] Support merging multiple images into a PDF, with drag-and-drop to adjust image order
 
 ### Dark Mode
 - [x] Toggle between light and dark themes
