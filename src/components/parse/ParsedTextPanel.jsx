@@ -24,18 +24,18 @@ export default function ParsedTextPanel({ t, parsedPages, parsedPageItems, curre
   return (
     <div className="card space-y-6">
       <div className="flex items-center justify-between">
-        <h4 className="text-lg font-semibold text-gray-900 dark:text-white">{t('extractedText')}</h4>
+        <h4 className="text-lg font-semibold text-ink">{t('extractedText')}</h4>
         <div className="flex gap-2">
           <button
             type="button"
-            className="btn-secondary px-4 py-2 rounded-xl"
+            className="btn-secondary px-4 py-2"
             onClick={handleCopyAll}
           >
             {t('copyAll')}
           </button>
           <button
             type="button"
-            className="btn-secondary px-4 py-2 rounded-xl"
+            className="btn-secondary px-4 py-2"
             onClick={handleExportTxt}
           >
             {t('exportTxt')}
@@ -52,7 +52,7 @@ export default function ParsedTextPanel({ t, parsedPages, parsedPageItems, curre
         >
           {t('prev')}
         </button>
-        <span className="text-sm text-muted-600 dark:text-muted-400">
+        <span className="text-sm text-ink-muted">
           {t('page')} {currentParsedPage} / {(parsedPages || []).length}
         </span>
         <button
@@ -68,7 +68,7 @@ export default function ParsedTextPanel({ t, parsedPages, parsedPageItems, curre
       <div
         ref={rightTextRef}
         onMouseUp={handleRightSelection}
-        className="bg-muted-50 dark:bg-gray-700 border border-muted-200 dark:border-gray-600 rounded-xl p-4 text-sm whitespace-pre-wrap break-words text-gray-900 dark:text-white"
+        className="bg-surface-alt border border-line rounded-btn p-4 text-sm whitespace-pre-wrap break-words text-ink"
       >
         {((parsedPageItems && parsedPageItems[currentParsedPage - 1]) || []).length > 0 ? (
           (parsedPageItems[currentParsedPage - 1] || []).map((item, idx) => (
@@ -84,7 +84,7 @@ export default function ParsedTextPanel({ t, parsedPages, parsedPageItems, curre
       <div className="text-center">
         <button
           type="button"
-          className="btn-secondary text-lg px-8 py-4 rounded-xl"
+          className="btn-secondary text-lg px-8 py-4"
           onClick={handleCopyPage}
         >
           {t('copyPage')}

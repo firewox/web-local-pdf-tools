@@ -376,7 +376,7 @@ function App() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-muted-50 to-muted-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen text-ink">
       {/* Responsive Navbar Header */}
       <HeaderNav t={t} activeTab={activeTab} setActiveTab={setActiveTab} resetForm={resetForm} />
       <div className="container mx-auto max-w-4xl px-4 py-8">
@@ -508,44 +508,44 @@ function App() {
 
         {/* Info Section */}
         <div className="card mt-12">
-          <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('features')}</h4>
-          <ul className="space-y-2 text-muted-600 dark:text-muted-300 mb-6">
+          <h4 className="text-lg font-semibold text-ink mb-4">{t('features')}</h4>
+          <ul className="space-y-2 text-ink-muted mb-6">
             <li className="flex items-start gap-2">
-              <span className="text-primary-600 dark:text-primary-400 font-bold">•</span>
-              <span><strong className="text-gray-900 dark:text-white">{t('compress')}:</strong> {t('compressFeature')}</span>
+              <span className="text-brand font-bold">•</span>
+              <span><strong className="text-ink">{t('compress')}:</strong> {t('compressFeature')}</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-primary-600 dark:text-primary-400 font-bold">•</span>
-              <span><strong className="text-gray-900 dark:text-white">{t('merge')}:</strong> {t('mergeFeature')}</span>
+              <span className="text-brand font-bold">•</span>
+              <span><strong className="text-ink">{t('merge')}:</strong> {t('mergeFeature')}</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-primary-600 dark:text-primary-400 font-bold">•</span>
-              <span><strong className="text-gray-900 dark:text-white">{t('split')}:</strong> {t('splitFeature')}</span>
+              <span className="text-brand font-bold">•</span>
+              <span><strong className="text-ink">{t('split')}:</strong> {t('splitFeature')}</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-primary-600 dark:text-primary-400 font-bold">•</span>
-              <span><strong className="text-gray-900 dark:text-white">{t('parse')}:</strong> {t('parseFeature')}</span>
+              <span className="text-brand font-bold">•</span>
+              <span><strong className="text-ink">{t('parse')}:</strong> {t('parseFeature')}</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-primary-600 dark:text-primary-400 font-bold">•</span>
-              <span><strong className="text-gray-900 dark:text-white">Progress Bar:</strong> {t('progressBarFeature')}</span>
+              <span className="text-brand font-bold">•</span>
+              <span><strong className="text-ink">Progress Bar:</strong> {t('progressBarFeature')}</span>
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-primary-600 dark:text-primary-400 font-bold">•</span>
-              <span><strong className="text-gray-900 dark:text-white">{t('convert')}:</strong> {t('convertFeature')}</span>
+              <span className="text-brand font-bold">•</span>
+              <span><strong className="text-ink">{t('convert')}:</strong> {t('convertFeature')}</span>
             </li>
           </ul>
 
-          <div className="border-t border-muted-200 dark:border-gray-700 pt-6">
-            <p className="text-muted-600 dark:text-muted-300 mb-4">
-              <strong className="text-gray-900 dark:text-white">{t('privacySecurity')}</strong><br />
+          <div className="border-t border-line pt-6">
+            <p className="text-ink-muted mb-4">
+              <strong className="text-ink">{t('privacySecurity')}</strong><br />
               {t('privacyText')}
             </p>
 
             <a
               href="https://github.com/firewox/web-local-pdf-tools"
               target="_blank"
-              className="text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium underline decoration-2 underline-offset-2"
+              className="text-brand hover:text-brand-strong font-medium underline decoration-2 underline-offset-2"
             >
               {t('viewSourceCode')}
             </a>
@@ -560,7 +560,7 @@ function App() {
               href="https://github.com/sponsors/firewox"
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-secondary flex items-center px-6 py-2 rounded-lg font-medium border border-pink-400 text-pink-600 bg-white shadow-soft"
+              className="btn-secondary flex items-center px-6 py-2 font-medium"
               title="Sponsor @firewox on GitHub"
             >
               <svg aria-hidden="true" height="20" viewBox="0 0 16 16" width="20" className="mr-2 v-align-middle text-pink-500" fill="currentColor">
@@ -576,9 +576,9 @@ function App() {
         </div>
 
         {/* Footer */}
-        <footer className="border-t border-muted-200 dark:border-gray-700 pt-6">
+        <footer className="border-t border-line pt-6">
           <div className="flex justify-between items-center">
-            <p className="text-muted-600 dark:text-muted-300">
+            <p className="text-ink-muted">
               {t('copyright', { year: new Date().getFullYear() })}
             </p>
           </div>

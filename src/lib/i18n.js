@@ -127,7 +127,16 @@ const resources = {
       // Language
       "language": "Language",
       "english": "English", 
-      "chinese": "简体中文"
+      "chinese": "简体中文",
+
+      // UI theme switcher
+      "uiTheme": "UI style",
+      "themeBentoDesc": "Clean modular cards",
+      "themeAuroraDesc": "Glass & aurora glow",
+      "themeSwissDesc": "Typographic grid",
+      "themeBrutalismDesc": "Bold & raw",
+      "themeTerminalDesc": "Phosphor console",
+      "dropHere": "or drag & drop files here"
     }
   },
   zh: {
@@ -255,7 +264,16 @@ const resources = {
       // Language
       "language": "语言",
       "english": "English",
-      "chinese": "简体中文"
+      "chinese": "简体中文",
+
+      // UI theme switcher
+      "uiTheme": "界面风格",
+      "themeBentoDesc": "干净的模块化卡片",
+      "themeAuroraDesc": "玻璃质感与极光渐变",
+      "themeSwissDesc": "瑞士排版网格",
+      "themeBrutalismDesc": "粗犷醒目的新粗野主义",
+      "themeTerminalDesc": "荧光终端控制台",
+      "dropHere": "或拖拽文件到此处"
     }
   }
 };

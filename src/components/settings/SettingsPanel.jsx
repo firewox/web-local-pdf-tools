@@ -28,7 +28,7 @@ export default function SettingsPanel({
     <div className="card space-y-6">
       {useCustomCommand ? (
         <div className="space-y-3">
-          <label className="block text-sm font-medium text-gray-900 dark:text-white">
+          <label className="block text-sm font-medium text-ink">
             {t('customCommand')}
           </label>
           <input
@@ -38,7 +38,7 @@ export default function SettingsPanel({
             placeholder={t('customCommandPlaceholder')}
             className="input font-mono text-sm"
           />
-          <p className="text-xs text-muted-600 dark:text-muted-400">
+          <p className="text-xs text-ink-faint">
             {t('customCommandHelp')}
           </p>
         </div>
@@ -46,7 +46,7 @@ export default function SettingsPanel({
         <div className="space-y-6">
           {(activeTab === 'compress' || activeTab === 'merge') && (
             <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-900 dark:text-white">
+              <label className="block text-sm font-medium text-ink">
                 {t('pdfQualitySetting')}
               </label>
               <select
@@ -63,7 +63,7 @@ export default function SettingsPanel({
 
           {activeTab === 'split' && (
             <div className="space-y-3">
-              <label className="block text-sm font-medium text-gray-900 dark:text-white">
+              <label className="block text-sm font-medium text-ink">
                 {t('pageRange')}
               </label>
               <div className="flex items-center gap-4">
@@ -75,7 +75,7 @@ export default function SettingsPanel({
                   min="1"
                   className="input flex-1"
                 />
-                <span className="text-muted-600 dark:text-muted-400 font-medium">{t('to')}</span>
+                <span className="text-ink-muted font-medium">{t('to')}</span>
                 <input
                   type="number"
                   placeholder={t('endPage')}
@@ -95,9 +95,9 @@ export default function SettingsPanel({
               id="showTerminalOutput"
               checked={showTerminalOutput}
               onChange={(e) => setShowTerminalOutput(e.target.checked)}
-              className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 focus:ring-2"
+              className="w-4 h-4 rounded cursor-pointer"
             />
-            <label htmlFor="showTerminalOutput" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
+            <label htmlFor="showTerminalOutput" className="text-sm font-medium text-ink cursor-pointer">
               {t('showTerminalOutput')}
             </label>
           </div>
@@ -109,9 +109,9 @@ export default function SettingsPanel({
               id="showProgressBar"
               checked={showProgressBar}
               onChange={(e) => setShowProgressBar(e.target.checked)}
-              className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 focus:ring-2"
+              className="w-4 h-4 rounded cursor-pointer"
             />
-            <label htmlFor="showProgressBar" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
+            <label htmlFor="showProgressBar" className="text-sm font-medium text-ink cursor-pointer">
               {t('showProgressBar')}
             </label>
           </div>
@@ -123,9 +123,9 @@ export default function SettingsPanel({
               id="useAdvancedSettings"
               checked={useAdvancedSettings}
               onChange={(e) => setUseAdvancedSettings(e.target.checked)}
-              className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 focus:ring-2"
+              className="w-4 h-4 rounded cursor-pointer"
             />
-          <label htmlFor="useAdvancedSettings" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
+          <label htmlFor="useAdvancedSettings" className="text-sm font-medium text-ink cursor-pointer">
             {t('useAdvancedSettings')}
           </label>
         </div>
@@ -133,7 +133,7 @@ export default function SettingsPanel({
         {/* Page Selection for PDF to Image Conversion */}
         {activeTab === 'convert' && convertFormat && ['jpg', 'jpeg', 'png', 'bmp'].includes(convertFormat) && (files?.length || 0) > 0 && isPdfSelected && (
           <div className="space-y-3">
-            <label className="block text-sm font-medium text-gray-900 dark:text-white">
+            <label className="block text-sm font-medium text-ink">
               {pdfPageCount > 0 ? `${t('selectPages')} (1-${pdfPageCount})` : t('pageSelectionLoading')}
             </label>
             <input
@@ -144,7 +144,7 @@ export default function SettingsPanel({
               className="input"
               disabled={pdfPageCount === 0}
             />
-            <p className="text-xs text-muted-600 dark:text-muted-400">
+            <p className="text-xs text-ink-faint">
               {t('pageSelectionHelp')}
             </p>
           </div>
@@ -165,16 +165,16 @@ export default function SettingsPanel({
                       downsample: e.target.checked
                     }
                   }))}
-                  className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500 focus:ring-2"
+                  className="w-4 h-4 rounded cursor-pointer"
                 />
-                <label htmlFor="downsampleImages" className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer">
+                <label htmlFor="downsampleImages" className="text-sm font-medium text-ink cursor-pointer">
                   {t('downsampleImages')}
                 </label>
               </div>
 
               {advancedSettings.colorImageSettings.downsample && (
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                  <label className="text-sm font-medium text-gray-900 dark:text-white">
+                  <label className="text-sm font-medium text-ink">
                     {t('colorImageResolution')}
                   </label>
                   <input

@@ -1,10 +1,22 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-ui="bento">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/pdf-file.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Local PDF Tools - Compress, Merge, Split</title>
+    <script>
+      (function () {
+        var d = document.documentElement;
+        var qs = new URLSearchParams(location.search);
+        var ui = qs.get('ui') || localStorage.getItem('ui-theme');
+        if (ui) d.dataset.ui = ui;
+        var darkParam = qs.get('dark');
+        var saved = localStorage.getItem('theme');
+        var dark = darkParam ? darkParam === '1' : (saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) d.classList.add('dark');
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -8,6 +8,36 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Semantic theme tokens - values come from CSS variables (see src/index.css)
+        surface: {
+          DEFAULT: 'var(--surface)',
+          alt: 'var(--surface-alt)',
+          hover: 'var(--surface-hover)',
+        },
+        line: {
+          DEFAULT: 'var(--line)',
+          strong: 'var(--line-strong)',
+        },
+        ink: {
+          DEFAULT: 'var(--ink)',
+          muted: 'var(--ink-muted)',
+          faint: 'var(--ink-faint)',
+        },
+        brand: {
+          DEFAULT: 'var(--brand)',
+          strong: 'var(--brand-strong)',
+          ink: 'var(--brand-ink)',
+          soft: 'var(--brand-soft)',
+        },
+        ok: {
+          DEFAULT: 'var(--ok)',
+          soft: 'var(--ok-soft)',
+        },
+        danger: {
+          DEFAULT: 'var(--danger)',
+          soft: 'var(--danger-soft)',
+        },
+        // Legacy palettes kept for gradual migration
         primary: {
           50: '#eff6ff',
           100: '#dbeafe',
@@ -49,22 +79,33 @@ export default {
         }
       },
       fontFamily: {
-        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'sans-serif'],
+        sans: ['var(--font-body)'],
+        display: ['var(--font-display)'],
+        mono: ['var(--font-mono)'],
       },
       boxShadow: {
-        'soft': '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
-        'medium': '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-        'large': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-        'glow': '0 0 20px rgba(59, 130, 246, 0.3)',
+        'card': 'var(--shadow-card)',
+        'pop': 'var(--shadow-pop)',
+        'glow': 'var(--shadow-glow)',
       },
       borderRadius: {
+        'card': 'var(--radius-card)',
+        'btn': 'var(--radius-btn)',
+        'input': 'var(--radius-input)',
         'xl': '0.75rem',
         '2xl': '1rem',
         '3xl': '1.5rem',
       },
       animation: {
         'spin-slow': 'spin 2s linear infinite',
-      }
+        'fade-up': 'fadeUp 0.4s ease both',
+      },
+      keyframes: {
+        fadeUp: {
+          '0%': { opacity: '0', transform: 'translateY(8px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
     },
   },
   plugins: [],

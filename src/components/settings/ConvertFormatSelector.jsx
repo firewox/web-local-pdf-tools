@@ -1,7 +1,7 @@
 export default function ConvertFormatSelector({ t, convertFormat, setConvertFormat, supportedFormats }) {
   return (
     <div className="space-y-4">
-      <label className="block text-sm font-medium text-gray-900 dark:text-white">
+      <label className="block text-sm font-medium text-ink">
         {t('convertTo')}
       </label>
       <select

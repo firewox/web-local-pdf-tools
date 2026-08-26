@@ -122,10 +122,10 @@ export default function PdfPreview({ url, t }) {
   if (!url) {
     return (
       <div className="text-center py-8">
-        <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-          <span className="text-2xl font-bold text-gray-600 dark:text-gray-400">PDF</span>
+        <div className="w-16 h-16 mx-auto mb-4 bg-surface-alt rounded-full flex items-center justify-center">
+          <span className="text-2xl font-bold text-ink-faint">PDF</span>
         </div>
-        <p className="text-muted-600 dark:text-muted-400">No PDF available for preview</p>
+        <p className="text-ink-muted">No PDF available for preview</p>
       </div>
     );
   }
@@ -134,9 +134,9 @@ export default function PdfPreview({ url, t }) {
     return (
       <div className="text-center py-8">
         <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-2 border-line border-t-brand"></div>
         </div>
-        <p className="text-muted-600 dark:text-muted-400">Loading PDF...</p>
+        <p className="text-ink-muted">Loading PDF...</p>
       </div>
     );
   }
@@ -144,15 +144,15 @@ export default function PdfPreview({ url, t }) {
   if (error) {
     return (
       <div className="text-center py-8">
-        <p className="text-red-600 dark:text-red-400">{error}</p>
+        <p className="text-danger">{error}</p>
       </div>
     );
   }
 
   return (
-    <div ref={previewContainerRef} className="w-full bg-white dark:bg-gray-900 p-4">
+    <div ref={previewContainerRef} className="w-full bg-white p-4">
       <div className="flex items-center justify-between mb-4">
-        <div className="text-sm text-muted-600 dark:text-muted-400">
+        <div className="text-sm text-ink-muted">
           {t ? t('page') : 'Page'} {currentPage} / {totalPages}
         </div>
         <div className="flex gap-2">
@@ -160,12 +160,12 @@ export default function PdfPreview({ url, t }) {
           <button onClick={goToNextPage} className="btn-secondary">{t ? t('next') : 'Next'}</button>
         </div>
       </div>
-      <div className="border border-muted-200 dark:border-gray-700 rounded-xl overflow-hidden">
+      <div className="border border-line rounded-btn overflow-hidden">
         <canvas ref={canvasRef} className="max-w-full h-auto shadow-lg" style={{ display: 'block' }} />
       </div>
       {loading && (
         <div className="text-center py-2">
-          <span className="text-sm text-muted-600 dark:text-muted-400">Rendering...</span>
+          <span className="text-sm text-ink-muted">Rendering...</span>
         </div>
       )}
     </div>

@@ -13,20 +13,20 @@ export default function ProgressBar({ progressInfo, t }) {
     <>
       {total > 0 ? (
         <>
-          <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-3 mb-2">
+          <div className="w-full bg-surface-alt border border-line rounded-full h-3 mb-2 overflow-hidden">
             <div
-              className="bg-primary-600 h-3 rounded-full transition-all duration-300 ease-out"
-              style={{ width: `${(current / total) * 100}%` }}
-            ></div>
+              className="bg-brand h-full rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${(current / total) * 100}%`, boxShadow: 'var(--shadow-glow)' }}
+            />
           </div>
-          <div className="flex justify-between text-xs text-muted-600 dark:text-muted-400">
+          <div className="flex justify-between text-xs text-ink-muted">
             <span>{t('percentComplete', { percent: Math.round((current / total) * 100) })}</span>
             <span>{t('pagesProgress', { current, total })}</span>
           </div>
         </>
       ) : (
         <div className="flex items-center justify-center py-2">
-          <div className="animate-pulse text-sm text-muted-600 dark:text-muted-400">
+          <div className="animate-pulse text-sm text-ink-muted">
             {t('processingPage', { page: currentPage })}
           </div>
         </div>

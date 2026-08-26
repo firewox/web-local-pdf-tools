@@ -3,7 +3,7 @@ export default function ActionSubmit({ t, activeTab, convertFormat }) {
     <div className="text-center">
       <button
         type="submit"
-        className="btn-primary text-lg px-8 py-4 rounded-xl"
+        className="btn-primary text-lg px-8 py-4"
         disabled={activeTab === 'convert' && !convertFormat}
       >
         {activeTab === 'compress' && t('compressPdf')}

@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 export default function FileSelector({
   t,
   activeTab,
@@ -16,8 +18,16 @@ export default function FileSelector({
   fileReorderEnabled,
   imageReorderMode,
 }) {
+  const [isDragOver, setIsDragOver] = useState(false);
   const accept = activeTab === 'convert' ? "application/pdf,image/*,.jpg,.jpeg,.png,.bmp" : "application/pdf";
   const multiple = activeTab === 'merge' || activeTab === 'convert';
+
+  const onDropFiles = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (!e.dataTransfer?.files?.length) return;
+    changeHandler({ target: { files: e.dataTransfer.files, value: '' } });
+  };
 
   return (
     <div className="space-y-6">
@@ -30,29 +40,39 @@ export default function FileSelector({
         id="files"
         className="hidden"
       />
-      <div className="text-center">
-        <label
-          htmlFor="files"
-          className="btn-primary cursor-pointer text-lg px-8 py-4 rounded-xl"
-        >
+      <label
+        htmlFor="files"
+        className={`dropzone${isDragOver ? ' is-dragover' : ''}`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragOver(true);
+        }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={onDropFiles}
+      >
+        <svg className="w-10 h-10" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V7.75m0 0l-3.25 3.25M12 7.75l3.25 3.25M4.5 15.75v1.5a3 3 0 003 3h9a3 3 0 003-3v-1.5" />
+        </svg>
+        <span className="text-base font-semibold">
           {files.length === 0
             ? t('chooseFiles', {
                 count: multiple ? 's' : '',
                 operation: t(activeTab).toLowerCase(),
               })
             : t('filesSelected', { count: files.length })}
-        </label>
-      </div>
+        </span>
+        <span className="text-xs text-ink-faint">{t('dropHere')}</span>
+      </label>
 
       {files.length > 0 && (
         <div className="card">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-4">
-            <span className="text-sm font-medium text-muted-600 dark:text-muted-400">
+            <span className="text-sm font-medium text-ink-muted">
               {t('filesSelected', { count: files.length })}
             </span>
             <button
               type="button"
-              className="btn-danger text-sm px-4 py-2 rounded-xl"
+              className="btn-danger text-sm px-4 py-2"
               onClick={clearAllFiles}
               title={t('clearAll')}
             >
@@ -65,11 +85,11 @@ export default function FileSelector({
               const reorderEnabled = fileReorderEnabled;
               const isDraggingItem = draggingIndex === index;
               const isDropTarget = dragOverIndex === index && draggingIndex !== null && draggingIndex !== index;
-              const baseClasses = "flex items-center justify-between p-4 bg-muted-50 dark:bg-gray-700 border border-muted-200 dark:border-gray-600 rounded-xl transition-all duration-150";
+              const baseClasses = "flex items-center justify-between p-4 bg-surface-alt border border-line rounded-btn transition-all duration-150";
               const dragClasses = reorderEnabled ? " cursor-grab active:cursor-grabbing" : "";
               const highlightClasses = [
-                isDraggingItem ? "opacity-75 ring-2 ring-primary-400" : "",
-                isDropTarget ? "ring-2 ring-primary-500 bg-primary-50/60 dark:bg-primary-900/20" : "",
+                isDraggingItem ? "opacity-75 ring-2 ring-brand" : "",
+                isDropTarget ? "ring-2 ring-brand bg-brand-soft" : "",
               ].join(' ');
 
               return (
@@ -83,10 +103,13 @@ export default function FileSelector({
                   onDrop={handleDrop(index)}
                   onDragEnd={handleDragEnd}
                 >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                  <div className="flex-1 min-w-0 flex items-center gap-3">
+                    <svg className="w-5 h-5 shrink-0 text-brand" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 12h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                    </svg>
+                    <p className="text-sm font-medium text-ink truncate">
                       {reorderEnabled && (
-                        <span className="mr-2 text-xs font-semibold text-muted-500 dark:text-muted-300 select-none">
+                        <span className="mr-2 text-xs font-semibold text-ink-faint select-none">
                           {index + 1}.
                         </span>
                       )}
@@ -95,9 +118,10 @@ export default function FileSelector({
                   </div>
                   <button
                     type="button"
-                    className="ml-4 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center text-sm font-bold transition-all duration-200 hover:scale-110"
+                    className="ml-4 w-6 h-6 shrink-0 bg-danger text-white rounded-full flex items-center justify-center text-sm font-bold transition-all duration-200 hover:scale-110 hover:brightness-110"
                     onClick={() => removeFile(index)}
                     title={t('removeFile')}
+                    aria-label={t('removeFile')}
                   >
                     ×
                   </button>
@@ -106,7 +130,7 @@ export default function FileSelector({
             })}
 
             {fileReorderEnabled && (
-              <p className="text-xs text-muted-600 dark:text-muted-400 text-center">
+              <p className="text-xs text-ink-faint text-center">
                 {t('dragToReorder')}
               </p>
             )}
@@ -114,10 +138,10 @@ export default function FileSelector({
             {(activeTab === 'merge' || (activeTab === 'convert' && imageReorderMode)) && (
               <button
                 type="button"
-                className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-muted-300 dark:border-gray-600 rounded-xl text-muted-600 dark:text-muted-400 hover:border-muted-400 dark:hover:border-gray-500 hover:text-muted-700 dark:hover:text-muted-300 transition-colors"
+                className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-line-strong rounded-btn text-ink-muted hover:border-brand hover:text-brand hover:bg-brand-soft transition-colors"
                 onClick={addMoreFiles}
               >
-                <span className="text-xl font-bold">+</span>
+                <span className="text-xl font-bold leading-none">+</span>
                 {t('addMoreFiles')}
               </button>
             )}
