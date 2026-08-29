@@ -30,23 +30,6 @@ function App() {
   const { t } = useTranslation();
   const terminalRef = useRef(null);
 
-  // Quality presets; merge offers an extra "keep original quality" option and
-  // defaults to it so combining files never silently re-compresses them.
-  const PDF_SETTINGS = {
-    ...(activeTab === 'merge' ? { original: t('originalQuality') } : null),
-    screen: t('screenOptimized'),
-    ebook: t('ebook'),
-    printer: t('printer'),
-    prepress: t('prepress'),
-    default: t('default'),
-  };
-
-  // Reset the preset when entering a tab: merge keeps original quality,
-  // the other tabs start from the ebook preset.
-  useEffect(() => {
-    setPdfSetting(activeTab === 'merge' ? 'original' : '/ebook');
-  }, [activeTab, setPdfSetting]);
-
   const {
     activeTab,
     setActiveTab,
@@ -92,6 +75,26 @@ function App() {
     pdfPageCount,
     setPdfPageCount,
   } = useSettings();
+
+  // Quality presets; merge offers an extra "keep original quality" option and
+  // defaults to it so combining files never silently re-compresses them.
+  // Defined after the hooks: it reads activeTab/setPdfSetting from them.
+  // Keys are the values passed to Ghostscript (-dPDFSETTINGS), so the select
+  // actually reflects the state value ('/ebook' etc.).
+  const PDF_SETTINGS = {
+    ...(activeTab === 'merge' ? { original: t('originalQuality') } : null),
+    '/screen': t('screenOptimized'),
+    '/ebook': t('ebook'),
+    '/printer': t('printer'),
+    '/prepress': t('prepress'),
+    '/default': t('default'),
+  };
+
+  // Reset the preset when entering a tab: merge keeps original quality,
+  // the other tabs start from the ebook preset.
+  useEffect(() => {
+    setPdfSetting(activeTab === 'merge' ? 'original' : '/ebook');
+  }, [activeTab, setPdfSetting]);
 
   const {
     parsedPages,
