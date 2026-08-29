@@ -13,3 +13,5 @@ firebase.json
 .opencode
 .trae
 logs/
+web-local-pdf-tools.exe
+*.exe
