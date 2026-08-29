@@ -1,4 +1,28 @@
 import PdfPreview from "../pdf/PdfPreview";
+import { formatBytes } from "../../utils/pdf";
+
+/**
+ * Build the size feedback line for a download entry.
+ * Compress/merge show a before -> after comparison; other operations show the
+ * output size only.
+ */
+function sizeSummary(t, link) {
+  const originalSize = link.originalSize || 0;
+  const newSize = link.newSize || 0;
+  if (newSize > 0 && originalSize > 0 && (link.operation === 'compress' || link.operation === 'merge')) {
+    const percent = Math.round((1 - newSize / originalSize) * 100);
+    if (percent > 0) {
+      return t('sizeSmaller', { before: formatBytes(originalSize), after: formatBytes(newSize), percent });
+    }
+    if (percent < 0) {
+      return t('sizeLarger', { before: formatBytes(originalSize), after: formatBytes(newSize), percent: Math.abs(percent) });
+    }
+  }
+  if (newSize > 0) {
+    return t('outputSize', { size: formatBytes(newSize) });
+  }
+  return null;
+}
 
 export default function DownloadList({ t, downloadLinks, onProcessAgain, onChooseNewFiles }) {
   return (
@@ -18,7 +42,7 @@ export default function DownloadList({ t, downloadLinks, onProcessAgain, onChoos
 
       {downloadLinks.map((link, index) => (
         <div key={index} className="card">
-          <h4 className="text-lg font-semibold text-ink mb-4">
+          <h4 className="text-lg font-semibold text-ink mb-1">
             {link.filename}
             {link.page && link.totalPages && link.totalPages > 1 && (
               <span className="text-sm text-ink-muted ml-2">
@@ -26,6 +50,10 @@ export default function DownloadList({ t, downloadLinks, onProcessAgain, onChoos
               </span>
             )}
           </h4>
+
+          {sizeSummary(t, link) && (
+            <p className="text-sm text-brand font-medium mb-4">{sizeSummary(t, link)}</p>
+          )}
 
           <div className="flex flex-col md:flex-row gap-6">
             {link.operation === 'convert' && link.url && (

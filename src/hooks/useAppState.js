@@ -10,6 +10,7 @@ export const useAppState = () => {
   const [files, setFiles] = useState([]);
   const [downloadLinks, setDownloadLinks] = useState([]);
   const [errorMessage, setErrorMessage] = useState('');
+  const [notice, setNotice] = useState('');
   const [showTerminalOutput, setShowTerminalOutput] = useState(false);
   const [showProgressBar, setShowProgressBar] = useState(false);
   const [terminalData, setTerminalData] = useState('');
@@ -33,6 +34,8 @@ export const useAppState = () => {
     setDownloadLinks,
     errorMessage,
     setErrorMessage,
+    notice,
+    setNotice,
     showTerminalOutput,
     setShowTerminalOutput,
     showProgressBar,

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
-import { reorderFiles, isPdfFile, isImageFile } from '../utils/pdf';
+import { reorderFiles, isPdfFile, isImageFile, isPasswordError } from '../utils/pdf';
 
 const IMAGE_OUTPUT_FORMATS = [
   { value: 'jpg', label: 'JPG' },
@@ -50,6 +50,9 @@ const readPdfPageCount = async (file) => {
     await loadingTask.destroy?.();
     return count;
   } catch (error) {
+    // Surface password-protected files to the caller; other failures just
+    // mean the page count is unknown.
+    if (isPasswordError(error)) throw error;
     console.warn('Failed to read PDF page count:', error);
     return 0;
   }
@@ -72,6 +75,7 @@ export const useFileHandling = ({
   activeTab,
   setState,
   setErrorMessage,
+  setNotice,
   t,
   setSupportedFormats,
   setConvertFormat,
@@ -224,6 +228,7 @@ export const useFileHandling = ({
       return;
     }
 
+    setNotice?.('');
     let errorMessage = '';
     let nextFiles = [];
 
@@ -242,7 +247,14 @@ export const useFileHandling = ({
         } else {
           const pdfFile = pdfFiles[0];
           const record = buildFileRecord(pdfFile);
-          const pageCount = await readPdfPageCount(pdfFile);
+          let pageCount = 0;
+          try {
+            pageCount = await readPdfPageCount(pdfFile);
+          } catch (err) {
+            if (isPasswordError(err)) {
+              setNotice?.(t('pdfPasswordProtected'));
+            }
+          }
           nextFiles = [record];
           setSupportedFormats?.(IMAGE_OUTPUT_FORMATS);
           setConvertFormat?.((current) => (IMAGE_OUTPUT_FORMATS.some(option => option.value === current) ? current : 'jpg'));
@@ -269,6 +281,9 @@ export const useFileHandling = ({
         errorMessage = t('unsupportedConvertType');
       } else {
         const limited = activeTab === 'merge' ? pdfOnly : pdfOnly.slice(0, 1);
+        if (activeTab !== 'merge' && pdfOnly.length > 1) {
+          setNotice?.(t('onlyFirstFileUsed', { count: pdfOnly.length - 1 }));
+        }
         const records = createRecords(limited);
         nextFiles = appendRecords(records);
         resetConversionSelections();
@@ -294,7 +309,7 @@ export const useFileHandling = ({
     setFiles(nextFiles);
     setErrorMessage('');
     setState('selected');
-  }, [files, activeTab, setFiles, setState, setErrorMessage, t, setSupportedFormats, setConvertFormat, setSelectedPages, setPdfPageCount, resetConversionSelections]);
+  }, [files, activeTab, setFiles, setState, setErrorMessage, setNotice, t, setSupportedFormats, setConvertFormat, setSelectedPages, setPdfPageCount, resetConversionSelections]);
 
   return {
     draggingIndex,

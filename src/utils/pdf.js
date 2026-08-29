@@ -80,7 +80,6 @@ export const reorderFiles = (list, startIndex, endIndex) => {
 
 const LATIN_PREV_CHAR = /[A-Za-z0-9,;:!?%)\]"'”’]/;
 const LATIN_NEXT_CHAR = /[A-Za-z0-9(\["'“‘]/;
-
 /**
  * Decide whether a space belongs between two consecutive PDF text items.
  * Uses glyph geometry when available (gap larger than 0.2em), falling back to
@@ -135,4 +134,65 @@ export function joinPdfTextItems(items) {
     if (str || item.hasEOL) prev = item;
   }
   return text;
+}
+
+/**
+ * Format a byte count as a human-readable string (B / KB / MB / GB).
+ * @param {number} bytes
+ * @returns {string}
+ */
+export function formatBytes(bytes) {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return `${n} B`;
+  const units = ['KB', 'MB', 'GB'];
+  let value = n;
+  let unit = 'B';
+  for (const unitName of units) {
+    if (value < 1024) break;
+    value /= 1024;
+    unit = unitName;
+  }
+  return `${value >= 100 ? Math.round(value) : value.toFixed(1)} ${unit}`;
+}
+
+/**
+ * Detect password-protection errors from PDF.js or Ghostscript output.
+ * Accepts an Error object (checks name/message) or a raw message string.
+ * @param {Error|{name?: string, message?: string}|string} [error]
+ * @returns {boolean}
+ */
+export function isPasswordError(error) {
+  if (!error) return false;
+  if (error.name === 'PasswordException') return true;
+  return /password/i.test(String(error.message || error));
+}
+
+/**
+ * Return the page-selection tokens that are out of range or malformed,
+ * e.g. "1,999" with 10 pages -> ["999"]. Empty selection is always valid.
+ * @param {string} selection - page selection like "1,3-5"
+ * @param {number} totalPages
+ * @returns {string[]}
+ */
+export function findInvalidPageTokens(selection, totalPages) {
+  const invalid = [];
+  if (!selection || selection.trim() === '') return invalid;
+  for (const part of selection.split(',')) {
+    const token = part.trim();
+    if (!token) continue;
+    const rangeMatch = token.match(/^(\d+)-(\d+)$/);
+    if (rangeMatch) {
+      const start = parseInt(rangeMatch[1]);
+      const end = parseInt(rangeMatch[2]);
+      if (isNaN(start) || isNaN(end) || start < 1 || end < start || end > totalPages) {
+        invalid.push(token);
+      }
+    } else {
+      const page = parseInt(token);
+      if (isNaN(page) || page < 1 || page > totalPages) {
+        invalid.push(token);
+      }
+    }
+  }
+  return invalid;
 }

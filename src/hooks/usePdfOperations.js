@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { processWithGS } from '../services/pdfService.js';
 import { createPdfWithMultipleImages } from '../services/imagePdf.js';
 import * as pdfjsLib from 'pdfjs-dist';
-import { parsePageSelection, joinPdfTextItems } from '../utils/pdf.js';
+import { parsePageSelection, joinPdfTextItems, isPasswordError, findInvalidPageTokens } from '../utils/pdf.js';
 import { encodeBmp } from '../utils/bmp.js';
 
 /**
@@ -43,6 +43,7 @@ export const usePdfOperations = ({
   setSupportedFormats,
   selectedPages,
   setSelectedPages,
+  pdfPageCount,
   showTerminalOutput,
   showProgressBar,
   setState,
@@ -50,6 +51,7 @@ export const usePdfOperations = ({
   setProgressInfo,
   setDownloadLinks,
   setErrorMessage,
+  setNotice,
   setParsedPages,
   setParsedPageItems,
   setCurrentParsedPage,
@@ -92,6 +94,7 @@ export const usePdfOperations = ({
     setState('loading');
     setTerminalData('');
     setProgressInfo({ current: 0, total: 0, currentPage: 0 });
+    const originalSize = (inputFiles || []).reduce((sum, entry) => sum + (entry?.size || 0), 0);
 
     try {
       let dataObject = {
@@ -129,16 +132,18 @@ export const usePdfOperations = ({
       if (result.error) {
         console.error('Processing failed:', result.error);
         setState('error');
-        setErrorMessage(result.error);
+        setErrorMessage(isPasswordError(result.error) ? t('pdfPasswordProtected') : result.error);
         setTerminalData('');
         setProgressInfo({ current: 0, total: 0, currentPage: 0 });
         return;
       }
 
       let pdfURL;
+      let newSize = 0;
       if (result.pdfArrayBuffer) {
         const blob = new Blob([result.pdfArrayBuffer], { type: 'application/pdf' });
         pdfURL = URL.createObjectURL(blob);
+        newSize = blob.size;
       } else {
         pdfURL = await loadPDFData(result.pdfDataURL);
       }
@@ -146,7 +151,9 @@ export const usePdfOperations = ({
       setDownloadLinks([{
         url: pdfURL,
         filename: getOutputFilename(filename, operation),
-        operation
+        operation,
+        originalSize,
+        newSize
       }]);
       setState('toBeDownloaded');
       setTerminalData('');
@@ -155,7 +162,7 @@ export const usePdfOperations = ({
     } catch (error) {
       console.error('Processing failed:', error);
       setState('error');
-      setErrorMessage(error.message || 'An unexpected error occurred during processing');
+      setErrorMessage(isPasswordError(error) ? t('pdfPasswordProtected') : (error.message || 'An unexpected error occurred during processing'));
       setTerminalData('');
       setProgressInfo({ current: 0, total: 0, currentPage: 0 });
     }
@@ -236,7 +243,9 @@ export const usePdfOperations = ({
             filename: pageFilename,
             operation: 'convert',
             page: pageNum,
-            totalPages: numPages
+            totalPages: numPages,
+            originalSize: file.size || 0,
+            newSize: blob.size
           });
           
           setProgressInfo({ current: index + 1, total: pagesToConvert.length, currentPage: pageNum });
@@ -244,16 +253,19 @@ export const usePdfOperations = ({
         
         setDownloadLinks(downloadLinks);
       } else if (file.type.startsWith('image/') && convertFormat === 'pdf') {
+        const originalSize = inputFiles.reduce((sum, entry) => sum + (entry?.size || 0), 0);
         const pdfArrayBuffer = await createPdfWithMultipleImages(inputFiles);
         const pdfBlob = new Blob([pdfArrayBuffer], { type: 'application/pdf' });
         const pdfBlobUrl = URL.createObjectURL(pdfBlob);
         const pdfFileName = getOutputFilename(filename, 'convert');
-        
+
         setDownloadLinks([{
           url: pdfBlobUrl,
           filename: pdfFileName,
           operation: 'convert',
-          isPdf: true
+          isPdf: true,
+          originalSize,
+          newSize: pdfBlob.size
         }]);
       }
       
@@ -264,7 +276,7 @@ export const usePdfOperations = ({
     } catch (error) {
       console.error('Conversion failed:', error);
       setState('error');
-      setErrorMessage(error.message || 'An unexpected error occurred during conversion');
+      setErrorMessage(isPasswordError(error) ? t('pdfPasswordProtected') : (error.message || 'An unexpected error occurred during conversion'));
       setTerminalData('');
       setProgressInfo({ current: 0, total: 0, currentPage: 0 });
     }
@@ -322,7 +334,7 @@ export const usePdfOperations = ({
     } catch (error) {
       console.error('Parsing failed:', error);
       setState('error');
-      setErrorMessage(error.message || 'An unexpected error occurred during parsing');
+      setErrorMessage(isPasswordError(error) ? t('pdfPasswordProtected') : (error.message || 'An unexpected error occurred during parsing'));
       setTerminalData('');
       setProgressInfo({ current: 0, total: 0, currentPage: 0 });
     }
@@ -373,6 +385,7 @@ export const usePdfOperations = ({
     setFiles([]);
     setState('init');
     setErrorMessage('');
+    setNotice?.('');
     setDownloadLinks([]);
     setTerminalData('');
     setProgressInfo({ current: 0, total: 0, currentPage: 0 });
@@ -389,6 +402,7 @@ export const usePdfOperations = ({
     setFiles,
     setState,
     setErrorMessage,
+    setNotice,
     setDownloadLinks,
     setTerminalData,
     setProgressInfo,
@@ -445,6 +459,12 @@ export const usePdfOperations = ({
         setState('error');
         return false;
       }
+
+      if (pdfPageCount > 0 && end > pdfPageCount) {
+        setErrorMessage(t('pageRangeExceedsPages', { count: pdfPageCount }));
+        setState('error');
+        return false;
+      }
     }
 
     if (activeTab === 'convert' && !convertFormat) {
@@ -453,9 +473,17 @@ export const usePdfOperations = ({
       return false;
     }
 
+    if (activeTab === 'convert' && ['jpg', 'jpeg', 'png', 'bmp'].includes(convertFormat) && pdfPageCount > 0) {
+      if (findInvalidPageTokens(selectedPages, pdfPageCount).length > 0) {
+        setErrorMessage(t('invalidPageSelection'));
+        setState('error');
+        return false;
+      }
+    }
+
     setErrorMessage('');
     return true;
-  }, [files, activeTab, useCustomCommand, customCommand, splitRange, convertFormat, setErrorMessage, setState, t]);
+  }, [files, activeTab, useCustomCommand, customCommand, splitRange, convertFormat, selectedPages, pdfPageCount, setErrorMessage, setState, t]);
 
   const executeOperation = useCallback(async () => {
     if (!validateBeforeProcess()) {

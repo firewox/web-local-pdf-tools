@@ -517,6 +517,10 @@ npm run build:win:exe  # 构建并用 pkg 打包 Windows exe（web-local-pdf-too
 - 解析文本按 `hasEOL` 保留换行、中文连续、Latin 词距按字形几何判断（`joinPdfTextItems`）
 - 自定义 Ghostscript 命令补上开关入口并修复合并时的输入文件拼接
 - 修正质量下拉 i18n 键名（原 `pdfSettingScreen` 等键缺失导致显示原始键名）
+- 下载卡片显示大小反馈：压缩/合并展示"原大小 → 新大小（减小/增大 N%）"，其余操作展示输出大小
+- 页码校验：拆分结束页不得超过总页数；转换页码选择提交前校验，越界/非法 token 明确报错
+- 单文件操作（压缩/拆分/解析）拖入多个文件时通过 notice 横幅提示，不再静默丢弃
+- 加密 PDF 统一友好提示（识别 PDF.js `PasswordException` 与 GS 密码错误，`isPasswordError`）
 
 **已知问题 / 待办**：
 - [ ] 高级解析（OCR）待开发

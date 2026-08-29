@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePageSelection, reorderFiles, isPdfFile, isImageFile, joinPdfTextItems, pdfItemPrefix } from '../src/utils/pdf.js';
+import { parsePageSelection, reorderFiles, isPdfFile, isImageFile, joinPdfTextItems, pdfItemPrefix, formatBytes, isPasswordError, findInvalidPageTokens } from '../src/utils/pdf.js';
 import { encodeBmp } from '../src/utils/bmp.js';
 
 // ---------- parsePageSelection ----------
@@ -128,4 +128,38 @@ test('isPdfFile and isImageFile detect by MIME type or extension', () => {
   assert.equal(isImageFile({ type: 'image/png' }), true);
   assert.equal(isImageFile({ name: 'photo.bmp' }), true);
   assert.equal(isImageFile({ name: 'photo.tiff' }), false);
+});
+
+// ---------- formatBytes ----------
+
+test('formatBytes renders human-readable sizes', () => {
+  assert.equal(formatBytes(0), '0 B');
+  assert.equal(formatBytes(500), '500 B');
+  assert.equal(formatBytes(2048), '2.0 KB');
+  assert.equal(formatBytes(5 * 1024 * 1024), '5.0 MB');
+  assert.equal(formatBytes(3 * 1024 * 1024 * 1024), '3.0 GB');
+  assert.equal(formatBytes(1234567), '1.2 MB');
+  assert.equal(formatBytes(undefined), '0 B');
+});
+
+// ---------- isPasswordError ----------
+
+test('isPasswordError detects PDF.js and Ghostscript password failures', () => {
+  assert.equal(isPasswordError({ name: 'PasswordException', message: 'No password given' }), true);
+  assert.equal(isPasswordError(new Error('This PDF requires a password')), true);
+  assert.equal(isPasswordError('Ghostscript error: Incorrect password given'), true);
+  assert.equal(isPasswordError(new Error('File not found')), false);
+  assert.equal(isPasswordError('other failure'), false);
+  assert.equal(isPasswordError(null), false);
+  assert.equal(isPasswordError(undefined), false);
+});
+
+// ---------- findInvalidPageTokens ----------
+
+test('findInvalidPageTokens flags out-of-range and malformed tokens', () => {
+  assert.deepEqual(findInvalidPageTokens('1,3-5', 10), []);
+  assert.deepEqual(findInvalidPageTokens('', 10), []);
+  assert.deepEqual(findInvalidPageTokens('0,11,abc,5-2,4', 10), ['0', '11', 'abc', '5-2']);
+  assert.deepEqual(findInvalidPageTokens('1-10', 10), []);
+  assert.deepEqual(findInvalidPageTokens('1-11', 10), ['1-11']);
 });

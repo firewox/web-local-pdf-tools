@@ -98,6 +98,14 @@ const resources = {
       "validPageNumbers": "Please enter valid page numbers. End page must be greater than or equal to start page.",
       "enterCustomCommand": "Please enter a custom command or disable custom command mode.",
       "customCommandRequired": "Custom command must include -sDEVICE= and -sOutputFile= parameters.",
+      "pageRangeExceedsPages": "End page exceeds the document ({{count}} pages total).",
+      "onlyFirstFileUsed": "This operation processes a single file; the other {{count}} file(s) were ignored.",
+      "pdfPasswordProtected": "This PDF is password-protected. Please remove the password (e.g. re-save or print it to a new PDF) and try again.",
+
+      // Output size feedback
+      "outputSize": "File size: {{size}}",
+      "sizeSmaller": "{{before}} → {{after}} ({{percent}}% smaller)",
+      "sizeLarger": "{{before}} → {{after}} ({{percent}}% larger)",
       
       // Features section
       "features": "Features",
@@ -240,6 +248,14 @@ const resources = {
       "validPageNumbers": "请输入有效的页码。结束页必须大于或等于起始页。",
       "enterCustomCommand": "请输入自定义命令或禁用自定义命令模式。",
       "customCommandRequired": "自定义命令必须包含 -sDEVICE= 和 -sOutputFile= 参数。",
+      "pageRangeExceedsPages": "结束页超出文档范围（共 {{count}} 页）。",
+      "onlyFirstFileUsed": "该操作仅处理单个文件，已忽略其余 {{count}} 个文件。",
+      "pdfPasswordProtected": "该 PDF 已加密（需要密码）。请先解除密码（例如重新另存或打印为 PDF）后再试。",
+
+      // Output size feedback
+      "outputSize": "文件大小：{{size}}",
+      "sizeSmaller": "{{before}} → {{after}}（减小 {{percent}}%）",
+      "sizeLarger": "{{before}} → {{after}}（增大 {{percent}}%）",
       
       // Features section
       "features": "功能",

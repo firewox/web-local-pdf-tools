@@ -41,6 +41,8 @@ function App() {
     setDownloadLinks,
     errorMessage,
     setErrorMessage,
+    notice,
+    setNotice,
     showTerminalOutput,
     setShowTerminalOutput,
     showProgressBar,
@@ -130,6 +132,7 @@ function App() {
     activeTab,
     setState,
     setErrorMessage,
+    setNotice,
     t,
     setSupportedFormats,
     setConvertFormat,
@@ -168,6 +171,8 @@ function App() {
     setParsedPageItems,
     setCurrentParsedPage,
     setPdfPageCount,
+    pdfPageCount,
+    setNotice,
     showTerminalOutput,
     showProgressBar,
     pdfDocRef,
@@ -402,6 +407,11 @@ function App() {
 
         {state !== "loading" && state !== "toBeDownloaded" && state !== "error" && (
           <form onSubmit={onSubmit} className="space-y-8">
+            {notice && (
+              <div className="border border-line bg-brand-soft text-ink rounded-btn px-4 py-3 text-sm">
+                {notice}
+              </div>
+            )}
             <FileSelector
               t={t}
               activeTab={activeTab}
