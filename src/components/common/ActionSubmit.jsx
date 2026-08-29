@@ -1,10 +1,10 @@
-export default function ActionSubmit({ t, activeTab, convertFormat }) {
+export default function ActionSubmit({ t, activeTab, convertFormat, disabled }) {
   return (
-    <div className="text-center">
+    <div>
       <button
         type="submit"
-        className="btn-primary text-lg px-8 py-4"
-        disabled={activeTab === 'convert' && !convertFormat}
+        className="btn-primary w-full text-lg px-8 py-4"
+        disabled={disabled}
       >
         {activeTab === 'compress' && t('compressPdf')}
         {activeTab === 'merge' && t('mergePdfs')}
@@ -12,6 +12,9 @@ export default function ActionSubmit({ t, activeTab, convertFormat }) {
         {activeTab === 'parse' && t('parsePdf')}
         {activeTab === 'convert' && t('convertFile')}
       </button>
+      {disabled && (
+        <p className="text-xs text-ink-faint text-center mt-2">{t('selectFileFirst')}</p>
+      )}
     </div>
   );
 }

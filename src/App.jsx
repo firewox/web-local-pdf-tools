@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import * as pdfjsLib from 'pdfjs-dist';
 import { useTranslation } from 'react-i18next';
 import { isPdfFile, isImageFile } from './utils/pdf.js';
@@ -18,6 +18,7 @@ import FileSelector from './components/file/FileSelector.jsx';
 import SettingsPanel from './components/settings/SettingsPanel.jsx';
 import ConvertFormatSelector from './components/settings/ConvertFormatSelector.jsx';
 import HeaderNav from './components/common/HeaderNav.jsx';
+import ToolTabs from './components/common/ToolTabs.jsx';
 import OperationIntro from './components/common/OperationIntro.jsx';
 import PdfParsePreview from './components/parse/PdfParsePreview.jsx';
 import ParsedTextPanel from './components/parse/ParsedTextPanel.jsx';
@@ -27,7 +28,7 @@ import ActionSubmit from './components/common/ActionSubmit.jsx';
 
 
 function App() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const terminalRef = useRef(null);
 
   const {
@@ -80,16 +81,17 @@ function App() {
 
   // Quality presets; merge offers an extra "keep original quality" option and
   // defaults to it so combining files never silently re-compresses them.
-  // Defined after the hooks: it reads activeTab/setPdfSetting from them.
-  // Keys are the values passed to Ghostscript (-dPDFSETTINGS), so the select
-  // actually reflects the state value ('/ebook' etc.).
+  // Keys are the values passed to Ghostscript (-dPDFSETTINGS); each entry has a
+  // short label for the segmented control and a longer description line.
   const PDF_SETTINGS = {
-    ...(activeTab === 'merge' ? { original: t('originalQuality') } : null),
-    '/screen': t('screenOptimized'),
-    '/ebook': t('ebook'),
-    '/printer': t('printer'),
-    '/prepress': t('prepress'),
-    '/default': t('default'),
+    ...(activeTab === 'merge'
+      ? { original: { short: t('qualityOriginalShort'), desc: t('originalQuality') } }
+      : null),
+    '/screen': { short: t('qualityScreenShort'), desc: t('screenOptimized') },
+    '/ebook': { short: t('qualityEbookShort'), desc: t('ebook') },
+    '/printer': { short: t('qualityPrinterShort'), desc: t('printer') },
+    '/prepress': { short: t('qualityPrepressShort'), desc: t('prepress') },
+    '/default': { short: t('qualityDefaultShort'), desc: t('default') },
   };
 
   // Reset the preset when entering a tab: merge keeps original quality,
@@ -179,12 +181,58 @@ function App() {
     t,
   });
 
+  // Latest changeHandler for the window-level drop overlay
+  const changeHandlerRef = useRef(changeHandler);
+  changeHandlerRef.current = changeHandler;
+
+  // Full-window drag & drop: overlay + route drops through changeHandler.
+  // Drops that land on the dropzone are handled there (defaultPrevented).
+  const [dragActive, setDragActive] = useState(false);
+  useEffect(() => {
+    let depth = 0;
+    const hasFiles = (e) => Array.from(e.dataTransfer?.types || []).includes('Files');
+    const onDragEnter = (e) => {
+      if (!hasFiles(e)) return;
+      depth += 1;
+      setDragActive(true);
+    };
+    const onDragOver = (e) => {
+      if (hasFiles(e)) e.preventDefault();
+    };
+    const onDragLeave = () => {
+      depth = Math.max(0, depth - 1);
+      if (depth === 0) setDragActive(false);
+    };
+    const onDrop = (e) => {
+      depth = 0;
+      setDragActive(false);
+      if (e.defaultPrevented || !e.dataTransfer?.files?.length) return;
+      e.preventDefault();
+      changeHandlerRef.current?.({ target: { files: e.dataTransfer.files, value: '' } });
+    };
+    window.addEventListener('dragenter', onDragEnter);
+    window.addEventListener('dragover', onDragOver);
+    window.addEventListener('dragleave', onDragLeave);
+    window.addEventListener('drop', onDrop);
+    return () => {
+      window.removeEventListener('dragenter', onDragEnter);
+      window.removeEventListener('dragover', onDragOver);
+      window.removeEventListener('dragleave', onDragLeave);
+      window.removeEventListener('drop', onDrop);
+    };
+  }, []);
+
   // Auto-scroll terminal output to bottom
   useEffect(() => {
     if (terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
   }, [terminalData]);
+
+  // Keep the browser tab title in sync with the UI language
+  useEffect(() => {
+    document.title = t('title');
+  }, [t, i18n.language]);
 
   // Render pdf to canvas and build text layer for selection
   async function renderPdfPage(pageNum) {
@@ -392,100 +440,120 @@ function App() {
     (activeTab === 'merge' && files.length > 1) || isImageReorderMode()
   );
 
+  const fileSelector = (
+    <FileSelector
+      t={t}
+      activeTab={activeTab}
+      files={files}
+      changeHandler={changeHandler}
+      clearAllFiles={clearAllFiles}
+      removeFile={removeFile}
+      addMoreFiles={addMoreFiles}
+      draggingIndex={draggingIndex}
+      dragOverIndex={dragOverIndex}
+      handleDragStart={handleDragStart}
+      handleDragEnter={handleDragEnter}
+      handleDragOver={handleDragOver}
+      handleDrop={handleDrop}
+      handleDragEnd={handleDragEnd}
+      fileReorderEnabled={isFileReorderEnabled()}
+      imageReorderMode={isImageReorderMode()}
+    />
+  );
+
   return (
     <div className="min-h-screen text-ink">
       {/* Responsive Navbar Header */}
-      <HeaderNav t={t} activeTab={activeTab} setActiveTab={setActiveTab} resetForm={resetForm} />
-      <div className="container mx-auto max-w-4xl px-4 py-8">
+      <HeaderNav t={t} />
+      <div className="container mx-auto max-w-5xl px-4 py-8">
         {/* Info below navbar */}
         <PageSubtitle t={t} />
 
-        {/* Tabs removed per specification: switching via top bar menu only */}
+        {/* Tool selector cards (keys 1-5 also switch tools) */}
+        <div className="mb-6">
+          <ToolTabs t={t} activeTab={activeTab} setActiveTab={setActiveTab} resetForm={resetForm} />
+        </div>
 
         {/* Tab Content */}
         <OperationIntro t={t} activeTab={activeTab} />
 
-        {state !== "loading" && state !== "toBeDownloaded" && state !== "error" && (
-          <form onSubmit={onSubmit} className="space-y-8">
-            {notice && (
-              <div className="border border-line bg-brand-soft text-ink rounded-btn px-4 py-3 text-sm">
-                {notice}
-              </div>
-            )}
-            <FileSelector
-              t={t}
-              activeTab={activeTab}
-              files={files}
-              changeHandler={changeHandler}
-              clearAllFiles={clearAllFiles}
-              removeFile={removeFile}
-              addMoreFiles={addMoreFiles}
-              draggingIndex={draggingIndex}
-              dragOverIndex={dragOverIndex}
-              handleDragStart={handleDragStart}
-              handleDragEnter={handleDragEnter}
-              handleDragOver={handleDragOver}
-              handleDrop={handleDrop}
-              handleDragEnd={handleDragEnd}
-              fileReorderEnabled={isFileReorderEnabled()}
-              imageReorderMode={isImageReorderMode()}
-            />
-        
-        {files.length > 0 && state === "selected" && activeTab === 'convert' && (
-          <div className="card mt-6">
-            <ConvertFormatSelector
-              t={t}
-              convertFormat={convertFormat}
-              setConvertFormat={setConvertFormat}
-              supportedFormats={supportedFormats}
-            />
+        {notice && state !== "error" && (
+          <div className="mb-6 border border-line bg-brand-soft text-ink rounded-btn px-4 py-3 text-sm">
+            {notice}
           </div>
         )}
-        
-        <SettingsPanel
-          t={t}
-          useCustomCommand={useCustomCommand}
-          setUseCustomCommand={setUseCustomCommand}
-          customCommand={customCommand}
-          setCustomCommand={setCustomCommand}
-          PDF_SETTINGS={PDF_SETTINGS}
-          activeTab={activeTab}
-          pdfSetting={pdfSetting}
-          setPdfSetting={setPdfSetting}
-          splitRange={splitRange}
-          setSplitRange={setSplitRange}
-          showTerminalOutput={showTerminalOutput}
-          setShowTerminalOutput={setShowTerminalOutput}
-          showProgressBar={showProgressBar}
-          setShowProgressBar={setShowProgressBar}
-          useAdvancedSettings={useAdvancedSettings}
-          setUseAdvancedSettings={setUseAdvancedSettings}
-          advancedSettings={advancedSettings}
-          setAdvancedSettings={setAdvancedSettings}
-          convertFormat={convertFormat}
-          files={files}
-          selectedPages={selectedPages}
-          setSelectedPages={setSelectedPages}
-          pdfPageCount={pdfPageCount}
-          isPdfSelected={files.some(f => isPdfFile(f.file))}
-        />
 
-        {state === "selected" && (
-          <ActionSubmit t={t} activeTab={activeTab} convertFormat={convertFormat} />
-        )}
-          </form>
-        )}
-
-        {state === "loading" && (
-          <LoadingPanel
-            t={t}
-            activeTab={activeTab}
-            showProgressBar={showProgressBar}
-            progressInfo={progressInfo}
-            showTerminalOutput={showTerminalOutput}
-            terminalData={terminalData}
-            terminalRef={terminalRef}
-          />
+        {/* Workspace: files left, actions right; stacks on small screens.
+            While loading the progress card takes over the action column so
+            the file context stays on screen. */}
+        {(state === "init" || state === "selected" || state === "loading") && (
+          state === "loading" ? (
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">
+              <div className="min-w-0">
+                {fileSelector}
+              </div>
+              <LoadingPanel
+                t={t}
+                activeTab={activeTab}
+                showProgressBar={showProgressBar}
+                progressInfo={progressInfo}
+                showTerminalOutput={showTerminalOutput}
+                terminalData={terminalData}
+                terminalRef={terminalRef}
+              />
+            </div>
+          ) : (
+            <form onSubmit={onSubmit} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">
+              <div className="min-w-0">
+                {fileSelector}
+              </div>
+              <div className="space-y-4 lg:sticky lg:top-24">
+                {activeTab === 'convert' && files.length > 0 && (
+                  <div className="card">
+                    <ConvertFormatSelector
+                      t={t}
+                      convertFormat={convertFormat}
+                      setConvertFormat={setConvertFormat}
+                      supportedFormats={supportedFormats}
+                    />
+                  </div>
+                )}
+                <SettingsPanel
+                  t={t}
+                  useCustomCommand={useCustomCommand}
+                  setUseCustomCommand={setUseCustomCommand}
+                  customCommand={customCommand}
+                  setCustomCommand={setCustomCommand}
+                  PDF_SETTINGS={PDF_SETTINGS}
+                  activeTab={activeTab}
+                  pdfSetting={pdfSetting}
+                  setPdfSetting={setPdfSetting}
+                  splitRange={splitRange}
+                  setSplitRange={setSplitRange}
+                  showTerminalOutput={showTerminalOutput}
+                  setShowTerminalOutput={setShowTerminalOutput}
+                  showProgressBar={showProgressBar}
+                  setShowProgressBar={setShowProgressBar}
+                  useAdvancedSettings={useAdvancedSettings}
+                  setUseAdvancedSettings={setUseAdvancedSettings}
+                  advancedSettings={advancedSettings}
+                  setAdvancedSettings={setAdvancedSettings}
+                  convertFormat={convertFormat}
+                  files={files}
+                  selectedPages={selectedPages}
+                  setSelectedPages={setSelectedPages}
+                  pdfPageCount={pdfPageCount}
+                  isPdfSelected={files.some(f => isPdfFile(f.file))}
+                />
+                <ActionSubmit
+                  t={t}
+                  activeTab={activeTab}
+                  convertFormat={convertFormat}
+                  disabled={state !== 'selected' || (activeTab === 'convert' && !convertFormat)}
+                />
+              </div>
+            </form>
+          )
         )}
 
         {state === "error" && (
@@ -529,83 +597,74 @@ function App() {
           />
         )}
 
-        {/* Info Section */}
-        <div className="card mt-12">
-          <h4 className="text-lg font-semibold text-ink mb-4">{t('features')}</h4>
-          <ul className="space-y-2 text-ink-muted mb-6">
-            <li className="flex items-start gap-2">
-              <span className="text-brand font-bold">•</span>
-              <span><strong className="text-ink">{t('compress')}:</strong> {t('compressFeature')}</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-brand font-bold">•</span>
-              <span><strong className="text-ink">{t('merge')}:</strong> {t('mergeFeature')}</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-brand font-bold">•</span>
-              <span><strong className="text-ink">{t('split')}:</strong> {t('splitFeature')}</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-brand font-bold">•</span>
-              <span><strong className="text-ink">{t('parse')}:</strong> {t('parseFeature')}</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-brand font-bold">•</span>
-              <span><strong className="text-ink">Progress Bar:</strong> {t('progressBarFeature')}</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-brand font-bold">•</span>
-              <span><strong className="text-ink">{t('convert')}:</strong> {t('convertFeature')}</span>
-            </li>
-          </ul>
+        {/* Compact footer: features, privacy and support links */}
+        <footer className="mt-12 border-t border-line pt-8 pb-4 space-y-6 text-sm">
+          <div>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-ink-faint mb-3">{t('features')}</h4>
+            <ul className="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-ink-muted">
+              <li><strong className="text-ink">{t('compress')}:</strong> {t('compressFeature')}</li>
+              <li><strong className="text-ink">{t('merge')}:</strong> {t('mergeFeature')}</li>
+              <li><strong className="text-ink">{t('split')}:</strong> {t('splitFeature')}</li>
+              <li><strong className="text-ink">{t('parse')}:</strong> {t('parseFeature')}</li>
+              <li><strong className="text-ink">{t('convert')}:</strong> {t('convertFeature')}</li>
+              <li><strong className="text-ink">{t('progressBar')}:</strong> {t('progressBarFeature')}</li>
+            </ul>
+          </div>
 
-          <div className="border-t border-line pt-6">
-            <p className="text-ink-muted mb-4">
-              <strong className="text-ink">{t('privacySecurity')}</strong><br />
-              {t('privacyText')}
-            </p>
+          <p className="text-ink-muted">
+            <strong className="text-ink">{t('privacySecurity')}</strong>
+            <br />
+            {t('privacyText')}
+          </p>
 
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <a
               href="https://github.com/firewox/web-local-pdf-tools"
               target="_blank"
+              rel="noopener noreferrer"
               className="text-brand hover:text-brand-strong font-medium underline decoration-2 underline-offset-2"
             >
               {t('viewSourceCode')}
             </a>
+            <div className="flex items-center gap-3">
+              <a
+                id="sponsor-profile-button"
+                href="https://github.com/sponsors/firewox"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary flex items-center px-4 py-2 text-sm font-medium"
+                title="Sponsor @firewox on GitHub"
+              >
+                <svg aria-hidden="true" height="16" viewBox="0 0 16 16" width="16" className="mr-2 text-pink-500" fill="currentColor">
+                  <path d="m8 14.25.345.666a.75.75 0 0 1-.69 0l-.008-.004-.018-.01a7.152 7.152 0 0 1-.31-.17 22.055 22.055 0 0 1-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.066 22.066 0 0 1-3.744 2.584l-.018.01-.006.003h-.002ZM4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.58 20.58 0 0 0 8 13.393a20.58 20.58 0 0 0 3.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.749.749 0 0 1-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5Z"></path>
+                </svg>
+                <span className="font-semibold">{t('sponsor')}</span>
+              </a>
+              <a href="https://www.buymeacoffee.com/firewox" target="_blank" rel="noopener noreferrer">
+                <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style={{ height: '32px', width: '116px' }} />
+              </a>
+            </div>
           </div>
-        </div>
 
-        <div className="card mt-12">
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            {/* Sponsor Button */}
-            <a
-              id="sponsor-profile-button"
-              href="https://github.com/sponsors/firewox"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-secondary flex items-center px-6 py-2 font-medium"
-              title="Sponsor @firewox on GitHub"
-            >
-              <svg aria-hidden="true" height="20" viewBox="0 0 16 16" width="20" className="mr-2 v-align-middle text-pink-500" fill="currentColor">
-                <path d="m8 14.25.345.666a.75.75 0 0 1-.69 0l-.008-.004-.018-.01a7.152 7.152 0 0 1-.31-.17 22.055 22.055 0 0 1-3.434-2.414C2.045 10.731 0 8.35 0 5.5 0 2.836 2.086 1 4.25 1 5.797 1 7.153 1.802 8 3.02 8.847 1.802 10.203 1 11.75 1 13.914 1 16 2.836 16 5.5c0 2.85-2.045 5.231-3.885 6.818a22.066 22.066 0 0 1-3.744 2.584l-.018.01-.006.003h-.002ZM4.25 2.5c-1.336 0-2.75 1.164-2.75 3 0 2.15 1.58 4.144 3.365 5.682A20.58 20.58 0 0 0 8 13.393a20.58 20.58 0 0 0 3.135-2.211C12.92 9.644 14.5 7.65 14.5 5.5c0-1.836-1.414-3-2.75-3-1.373 0-2.609.986-3.029 2.456a.749.749 0 0 1-1.442 0C6.859 3.486 5.623 2.5 4.25 2.5Z"></path>
-              </svg>
-              <span className="v-align-middle font-semibold">{t('sponsor')}</span>
-            </a>
-            {/* Buy Me A Coffee Button */}
-            <a href="https://www.buymeacoffee.com/firewox" target="_blank" rel="noopener noreferrer">
-              <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style={{ height: '40px', width: '145px' }} />
-            </a>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <footer className="border-t border-line pt-6">
-          <div className="flex justify-between items-center">
-            <p className="text-ink-muted">
-              {t('copyright', { year: new Date().getFullYear() })}
-            </p>
+          <div className="border-t border-line pt-4">
+            <p className="text-ink-faint text-xs">{t('copyright', { year: new Date().getFullYear() })}</p>
           </div>
         </footer>
+
+        {/* Full-window drag overlay */}
+        {dragActive && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-none border-4 border-dashed border-brand"
+            aria-hidden="true"
+          >
+            <div className="card px-10 py-8 text-center">
+              <svg className="w-12 h-12 mx-auto mb-2 text-brand" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V7.75m0 0l-3.25 3.25M12 7.75l3.25 3.25M4.5 15.75v1.5a3 3 0 003 3h9a3 3 0 003-3v-1.5" />
+              </svg>
+              <p className="text-lg font-semibold text-brand">{t('dropFilesAnywhere')}</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -28,6 +28,9 @@ const resources = {
       "clearAll": "Clear All",
       "addMoreFiles": "Add more files",
       "removeFile": "Remove file",
+      "pages": "{{count}} pages",
+      "dropFilesAnywhere": "Drop to add files",
+      "selectFileFirst": "Select a file to enable processing",
       
       // Settings
       "pdfQualitySetting": "PDF Quality Setting:",
@@ -41,6 +44,13 @@ const resources = {
       
       // PDF Settings
       "originalQuality": "Keep original quality (no re-compression)",
+      "qualityOriginalShort": "Original",
+      "qualityScreenShort": "Screen",
+      "qualityEbookShort": "eBook",
+      "qualityPrinterShort": "Printer",
+      "qualityPrepressShort": "Prepress",
+      "qualityDefaultShort": "Default",
+      "advancedOptions": "Advanced options",
       "screenOptimized": "Screen-optimized (smallest)",
       "ebook": "eBook (small)",
       "printer": "Printer (balanced)",
@@ -90,6 +100,15 @@ const resources = {
       "pagesProgress": "{{current}}/{{total}} pages",
       "conversionComplete": "Conversion Complete",
       "preview": "Preview",
+      "previewNotAvailable": "Preview not available",
+      "noPdfPreview": "No PDF available for preview",
+      "loadingPdf": "Loading PDF...",
+      "rendering": "Rendering...",
+      "pdfLoadFailed": "Failed to load PDF",
+      "pdfRenderFailed": "Failed to render PDF page",
+      "progressBar": "Progress bar",
+      "switchToLight": "Switch to light mode",
+      "switchToDark": "Switch to dark mode",
       
       // Error messages
       "errorOccurred": "An error occurred while processing your PDF:",
@@ -178,6 +197,9 @@ const resources = {
       "clearAll": "清除全部",
       "addMoreFiles": "添加更多文件",
       "removeFile": "移除文件",
+      "pages": "{{count}} 页",
+      "dropFilesAnywhere": "松手即可添加文件",
+      "selectFileFirst": "选择文件后即可开始处理",
       
       // Settings
       "pdfQualitySetting": "PDF 质量设置：",
@@ -191,6 +213,13 @@ const resources = {
       
       // PDF Settings
       "originalQuality": "保持原始质量（不重新压缩）",
+      "qualityOriginalShort": "原始",
+      "qualityScreenShort": "屏幕",
+      "qualityEbookShort": "电子书",
+      "qualityPrinterShort": "打印",
+      "qualityPrepressShort": "印前",
+      "qualityDefaultShort": "默认",
+      "advancedOptions": "高级选项",
       "screenOptimized": "屏幕优化（最小）",
       "ebook": "电子书（小）",
       "printer": "打印机（平衡）",
@@ -240,6 +269,15 @@ const resources = {
       "pagesProgress": "{{current}}/{{total}} 页",
       "conversionComplete": "转换完成",
       "preview": "预览",
+      "previewNotAvailable": "暂不支持预览该格式",
+      "noPdfPreview": "暂无可预览的 PDF",
+      "loadingPdf": "正在加载 PDF...",
+      "rendering": "渲染中...",
+      "pdfLoadFailed": "PDF 加载失败",
+      "pdfRenderFailed": "PDF 页面渲染失败",
+      "progressBar": "进度条",
+      "switchToLight": "切换到亮色模式",
+      "switchToDark": "切换到暗色模式",
       
       // Error messages
       "errorOccurred": "处理您的 PDF 时发生错误：",

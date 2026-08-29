@@ -234,6 +234,18 @@ export const useFileHandling = ({
 
     const createRecords = (list) => list.map((file, index) => buildFileRecord(file, index));
     const appendRecords = (records) => (canAppend ? [...existingFiles, ...records] : records);
+    // Attach first-page count to every PDF record; encrypted files surface a notice
+    const attachPageCounts = async (records) => Promise.all(records.map(async (record) => {
+      if (!isPdfFile(record.file)) return record;
+      try {
+        return { ...record, pages: await readPdfPageCount(record.file) };
+      } catch (err) {
+        if (isPasswordError(err)) {
+          setNotice?.(t('pdfPasswordProtected'));
+        }
+        return record;
+      }
+    }));
 
     if (activeTab === 'convert') {
       const pdfFiles = pickedFiles.filter(isPdfFile);
@@ -245,21 +257,12 @@ export const useFileHandling = ({
         if (pdfFiles.length > 1) {
           errorMessage = t('multiplePdfsNotSupported');
         } else {
-          const pdfFile = pdfFiles[0];
-          const record = buildFileRecord(pdfFile);
-          let pageCount = 0;
-          try {
-            pageCount = await readPdfPageCount(pdfFile);
-          } catch (err) {
-            if (isPasswordError(err)) {
-              setNotice?.(t('pdfPasswordProtected'));
-            }
-          }
-          nextFiles = [record];
+          const records = await attachPageCounts(createRecords([pdfFiles[0]]));
+          nextFiles = appendRecords(records);
           setSupportedFormats?.(IMAGE_OUTPUT_FORMATS);
           setConvertFormat?.((current) => (IMAGE_OUTPUT_FORMATS.some(option => option.value === current) ? current : 'jpg'));
           setSelectedPages?.('');
-          setPdfPageCount?.(pageCount);
+          setPdfPageCount?.(records[0]?.pages || 0);
         }
       } else if (imageFiles.length) {
         if (!canAppend && existingFiles.length && !existingFiles.every(item => isImageFile(item.file))) {
@@ -284,7 +287,7 @@ export const useFileHandling = ({
         if (activeTab !== 'merge' && pdfOnly.length > 1) {
           setNotice?.(t('onlyFirstFileUsed', { count: pdfOnly.length - 1 }));
         }
-        const records = createRecords(limited);
+        const records = await attachPageCounts(createRecords(limited));
         nextFiles = appendRecords(records);
         resetConversionSelections();
       }

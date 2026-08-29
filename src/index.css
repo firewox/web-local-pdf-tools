@@ -552,6 +552,10 @@ input[type='checkbox'] { accent-color: var(--brand); }
   box-shadow: var(--shadow-btn-hover);
 }
 
+/* Hide scrollbars for horizontally scrollable strips (e.g. header tabs) */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 /* Drop zone for file selection */
 .dropzone {
   display: flex;
