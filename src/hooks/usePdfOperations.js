@@ -2,59 +2,22 @@ import { useCallback } from 'react';
 import { processWithGS } from '../services/pdfService.js';
 import { createPdfWithMultipleImages } from '../services/imagePdf.js';
 import * as pdfjsLib from 'pdfjs-dist';
-import { parsePageSelection } from '../utils/pdf.js';
+import { parsePageSelection, joinPdfTextItems } from '../utils/pdf.js';
+import { encodeBmp } from '../utils/bmp.js';
 
 /**
- * @description 加载 PDF 数据
- * @param {string|ArrayBuffer} response - PDF 数据
- * @param {string} filename - 文件名
- * @returns {Promise<object>} 包含 PDF URL 和大小的对象
+ * @description 将 Worker 返回的结果地址规范为可下载的 blob URL
+ * @param {string} response - blob URL 或其他 URL 形式（如 data URL）
+ * @returns {Promise<string>} blob URL
  */
-function loadPDFData(response, filename) {
-  return new Promise((resolve, reject) => {
-    try {
-      if (typeof response === 'string' && response.startsWith('blob:')) {
-        const xhr = new XMLHttpRequest();
-        xhr.open('HEAD', response);
-        xhr.onload = function() {
-          try {
-            const estimatedSize = 0;
-            resolve({ pdfURL: response, size: estimatedSize });
-          } catch (error) {
-            console.error('Error in HEAD request:', error);
-            resolve({ pdfURL: response, size: 0 });
-          }
-        };
-        xhr.onerror = function() {
-          resolve({ pdfURL: response, size: 0 });
-        };
-        xhr.send();
-      } else {
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', response);
-        xhr.responseType = 'arraybuffer';
-        xhr.onload = function () {
-          try {
-            window.URL.revokeObjectURL(response);
-            const blob = new Blob([xhr.response], { type: 'application/pdf' });
-            const pdfURL = window.URL.createObjectURL(blob);
-            const size = xhr.response.byteLength;
-            resolve({ pdfURL, size });
-          } catch (error) {
-            console.error('Error creating blob from array buffer:', error);
-            reject(error);
-          }
-        };
-        xhr.onerror = function () {
-          reject(new Error('Failed to load PDF data'));
-        };
-        xhr.send();
-      }
-    } catch (error) {
-      console.error('Error in loadPDFData:', error);
-      reject(error);
-    }
-  });
+async function loadPDFData(response) {
+  if (typeof response === 'string' && response.startsWith('blob:')) {
+    return response;
+  }
+  const res = await fetch(response);
+  const buffer = await res.arrayBuffer();
+  const blob = new Blob([buffer], { type: 'application/pdf' });
+  return URL.createObjectURL(blob);
 }
 
 /**
@@ -133,7 +96,8 @@ export const usePdfOperations = ({
     try {
       let dataObject = {
         operation,
-        pdfSetting: useCustomCommand ? null : pdfSetting,
+        // 'original' (merge) means no -dPDFSETTINGS: combine files without re-compressing
+        pdfSetting: (useCustomCommand || pdfSetting === 'original') ? null : pdfSetting,
         customCommand: useCustomCommand ? customCommand : null,
         advancedSettings: useAdvancedSettings ? advancedSettings : null,
         showTerminalOutput: showTerminalOutput,
@@ -172,15 +136,11 @@ export const usePdfOperations = ({
       }
 
       let pdfURL;
-      let newSize = 0;
       if (result.pdfArrayBuffer) {
         const blob = new Blob([result.pdfArrayBuffer], { type: 'application/pdf' });
         pdfURL = URL.createObjectURL(blob);
-        newSize = blob.size;
       } else {
-        const loaded = await loadPDFData(result.pdfDataURL, filename);
-        pdfURL = loaded.pdfURL;
-        newSize = loaded.size;
+        pdfURL = await loadPDFData(result.pdfDataURL);
       }
 
       setDownloadLinks([{
@@ -255,11 +215,15 @@ export const usePdfOperations = ({
           };
           
           await page.render(renderContext).promise;
-          
-          const imageUrl = canvas.toDataURL(`image/${convertFormat === 'jpg' ? 'jpeg' : convertFormat}`);
-          
-          const response = await fetch(imageUrl);
-          const blob = await response.blob();
+
+          // Canvas cannot encode BMP natively, so BMP goes through our own encoder
+          let blob;
+          if (convertFormat === 'bmp') {
+            blob = new Blob([encodeBmp(context.getImageData(0, 0, canvas.width, canvas.height))], { type: 'image/bmp' });
+          } else {
+            const imageUrl = canvas.toDataURL(`image/${convertFormat === 'jpg' ? 'jpeg' : convertFormat}`);
+            blob = await (await fetch(imageUrl)).blob();
+          }
           const url = window.URL.createObjectURL(blob);
           
           const baseName = filename.replace(/\.pdf$/i, '');
@@ -340,7 +304,7 @@ export const usePdfOperations = ({
       for (let pageNum = 1; pageNum <= numPages; pageNum++) {
         const page = await pdf.getPage(pageNum);
         const textContent = await page.getTextContent();
-        const text = textContent.items.map(item => item.str).join(' ');
+        const text = joinPdfTextItems(textContent.items);
         pagesText.push(text);
         pagesItems.push(textContent.items);
 

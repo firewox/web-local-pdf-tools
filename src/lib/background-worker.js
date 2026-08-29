@@ -279,6 +279,10 @@ function _GSMergePDF(dataStruct, responseCallback) {
             if (customCommand && customCommand.trim()) {
               args = parseCommandArgs(customCommand.trim());
               validateArgs(args, 'merge');
+              // Inputs are written to the virtual FS as input0.pdf...inputN.pdf
+              for (let i = 0; i < files.length; i++) {
+                args.push(`input${i}.pdf`);
+              }
             } else {
               args = [
                 "-sDEVICE=pdfwrite",

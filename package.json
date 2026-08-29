@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "node --test",
     "serve": "node server.cjs",
     "build:win:exe": "npm run build && pkg server.cjs --targets node18-win-x64 --output web-local-pdf-tools.exe"
   },

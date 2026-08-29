@@ -40,11 +40,16 @@ const resources = {
       "useAdvancedSettings": "Use advanced settings",
       
       // PDF Settings
+      "originalQuality": "Keep original quality (no re-compression)",
       "screenOptimized": "Screen-optimized (smallest)",
       "ebook": "eBook (small)",
-      "printer": "Printer (balanced)", 
+      "printer": "Printer (balanced)",
       "prepress": "Prepress (high quality)",
       "default": "Default (original quality)",
+      "useCustomCommand": "Use custom Ghostscript command",
+      "customCommand": "Custom Ghostscript command:",
+      "customCommandPlaceholder": "-sDEVICE=pdfwrite -sOutputFile=output.pdf input.pdf",
+      "customCommandHelp": "Input files are written to the virtual filesystem as input.pdf (merge: input0.pdf, input1.pdf, ...). Your command must include -sDEVICE=, write the result to output.pdf, and reference the input files. Example: -sDEVICE=pdfwrite -dPDFSETTINGS=/printer -sOutputFile=output.pdf input.pdf",
       
       // Advanced Settings
       "advancedPdfSettings": "Advanced PDF Settings",
@@ -177,11 +182,16 @@ const resources = {
       "useAdvancedSettings": "使用高级设置",
       
       // PDF Settings
+      "originalQuality": "保持原始质量（不重新压缩）",
       "screenOptimized": "屏幕优化（最小）",
       "ebook": "电子书（小）",
       "printer": "打印机（平衡）",
-      "prepress": "印前（高质量）", 
+      "prepress": "印前（高质量）",
       "default": "默认（原始质量）",
+      "useCustomCommand": "使用自定义 Ghostscript 命令",
+      "customCommand": "自定义 Ghostscript 命令：",
+      "customCommandPlaceholder": "-sDEVICE=pdfwrite -sOutputFile=output.pdf input.pdf",
+      "customCommandHelp": "输入文件会写入虚拟文件系统：input.pdf（合并时为 input0.pdf、input1.pdf……）。命令必须包含 -sDEVICE=，将结果输出到 output.pdf，并引用输入文件。示例：-sDEVICE=pdfwrite -dPDFSETTINGS=/printer -sOutputFile=output.pdf input.pdf",
       
       // Advanced Settings
       "advancedPdfSettings": "高级 PDF 设置",

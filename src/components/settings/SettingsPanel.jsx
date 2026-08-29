@@ -1,6 +1,7 @@
 export default function SettingsPanel({
   t,
   useCustomCommand,
+  setUseCustomCommand,
   customCommand,
   setCustomCommand,
   activeTab,
@@ -24,9 +25,27 @@ export default function SettingsPanel({
   isPdfSelected,
   PDF_SETTINGS,
 }) {
+  // Custom Ghostscript commands only apply to the WASM-backed operations
+  const isGsTab = activeTab === 'compress' || activeTab === 'merge' || activeTab === 'split';
+
   return (
     <div className="card space-y-6">
-      {useCustomCommand ? (
+      {isGsTab && (
+        <div className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            id="useCustomCommand"
+            checked={useCustomCommand}
+            onChange={(e) => setUseCustomCommand(e.target.checked)}
+            className="w-4 h-4 rounded cursor-pointer"
+          />
+          <label htmlFor="useCustomCommand" className="text-sm font-medium text-ink cursor-pointer">
+            {t('useCustomCommand')}
+          </label>
+        </div>
+      )}
+
+      {useCustomCommand && isGsTab ? (
         <div className="space-y-3">
           <label className="block text-sm font-medium text-ink">
             {t('customCommand')}

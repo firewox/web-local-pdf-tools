@@ -77,3 +77,62 @@ export const reorderFiles = (list, startIndex, endIndex) => {
   updated.splice(endIndex, 0, removed);
   return updated;
 };
+
+const LATIN_PREV_CHAR = /[A-Za-z0-9,;:!?%)\]"'”’]/;
+const LATIN_NEXT_CHAR = /[A-Za-z0-9(\["'“‘]/;
+
+/**
+ * Decide whether a space belongs between two consecutive PDF text items.
+ * Uses glyph geometry when available (gap larger than 0.2em), falling back to
+ * a script-aware heuristic that keeps CJK runs contiguous.
+ */
+function needsSpaceBetween(prevItem, item) {
+  const prevEnd = prevItem.transform && typeof prevItem.width === 'number'
+    ? prevItem.transform[4] + prevItem.width
+    : null;
+  const nextStart = item.transform ? item.transform[4] : null;
+
+  if (prevEnd == null || nextStart == null) {
+    const prevChar = prevItem.str[prevItem.str.length - 1];
+    const nextChar = item.str[0];
+    return LATIN_PREV_CHAR.test(prevChar) && LATIN_NEXT_CHAR.test(nextChar);
+  }
+
+  const fontSize = Math.abs(prevItem.transform[3]) || Math.abs(prevItem.transform[0]) || 10;
+  return nextStart - prevEnd > fontSize * 0.2;
+}
+
+/**
+ * Separator to render before a text item (after the previous one).
+ * Line breaks are handled by the previous item's hasEOL flag.
+ * @param {object} [prevItem]
+ * @param {object} [item]
+ * @returns {''|' '}
+ */
+export function pdfItemPrefix(prevItem, item) {
+  if (!prevItem || !item) return '';
+  if (prevItem.hasEOL) return '';
+  if (!(prevItem.str || '').length || !(item.str || '').length) return '';
+  return needsSpaceBetween(prevItem, item) ? ' ' : '';
+}
+
+/**
+ * Join PDF text items into readable plain text: keeps CJK runs contiguous,
+ * derives spaces from glyph geometry for Latin text, and honors hasEOL breaks.
+ * @param {Array<{str?: string, hasEOL?: boolean}>} items
+ * @returns {string}
+ */
+export function joinPdfTextItems(items) {
+  let text = '';
+  let prev = null;
+  for (const item of items || []) {
+    const str = item.str || '';
+    if (prev && str) text += pdfItemPrefix(prev, item);
+    text += str;
+    if (item.hasEOL) text += '\n';
+    // Empty items can still end a line; remember them so the next prefix
+    // knows the break already happened.
+    if (str || item.hasEOL) prev = item;
+  }
+  return text;
+}

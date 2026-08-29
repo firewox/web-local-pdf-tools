@@ -1,3 +1,6 @@
+import { Fragment } from 'react';
+import { pdfItemPrefix } from '../../utils/pdf';
+
 export default function ParsedTextPanel({ t, parsedPages, parsedPageItems, currentParsedPage, setCurrentParsedPage, rightTextRef, handleRightSelection, baseFilename }) {
   const handleCopyAll = () => {
     navigator.clipboard.writeText((parsedPages || []).join('\n\n'));
@@ -71,10 +74,14 @@ export default function ParsedTextPanel({ t, parsedPages, parsedPageItems, curre
         className="bg-surface-alt border border-line rounded-btn p-4 text-sm whitespace-pre-wrap break-words text-ink"
       >
         {((parsedPageItems && parsedPageItems[currentParsedPage - 1]) || []).length > 0 ? (
-          (parsedPageItems[currentParsedPage - 1] || []).map((item, idx) => (
-            <span key={idx} data-index={idx}>
-              {item.str + ' '}
-            </span>
+          (parsedPageItems[currentParsedPage - 1] || []).map((item, idx, arr) => (
+            <Fragment key={idx}>
+              {idx > 0 ? pdfItemPrefix(arr[idx - 1], item) : null}
+              <span data-index={idx}>
+                {item.str}
+                {item.hasEOL ? '\n' : ''}
+              </span>
+            </Fragment>
           ))
         ) : (
           <pre className="text-sm whitespace-pre-wrap break-words">{(parsedPages && parsedPages[currentParsedPage - 1]) || ''}</pre>

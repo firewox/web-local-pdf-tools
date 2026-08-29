@@ -30,13 +30,22 @@ function App() {
   const { t } = useTranslation();
   const terminalRef = useRef(null);
 
+  // Quality presets; merge offers an extra "keep original quality" option and
+  // defaults to it so combining files never silently re-compresses them.
   const PDF_SETTINGS = {
-    screen: t('pdfSettingScreen'),
-    ebook: t('pdfSettingEbook'),
-    printer: t('pdfSettingPrinter'),
-    prepress: t('pdfSettingPrepress'),
-    default: t('pdfSettingDefault'),
+    ...(activeTab === 'merge' ? { original: t('originalQuality') } : null),
+    screen: t('screenOptimized'),
+    ebook: t('ebook'),
+    printer: t('printer'),
+    prepress: t('prepress'),
+    default: t('default'),
   };
+
+  // Reset the preset when entering a tab: merge keeps original quality,
+  // the other tabs start from the ebook preset.
+  useEffect(() => {
+    setPdfSetting(activeTab === 'merge' ? 'original' : '/ebook');
+  }, [activeTab, setPdfSetting]);
 
   const {
     activeTab,
@@ -423,6 +432,7 @@ function App() {
         <SettingsPanel
           t={t}
           useCustomCommand={useCustomCommand}
+          setUseCustomCommand={setUseCustomCommand}
           customCommand={customCommand}
           setCustomCommand={setCustomCommand}
           PDF_SETTINGS={PDF_SETTINGS}
