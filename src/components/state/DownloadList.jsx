@@ -82,7 +82,7 @@ export default function DownloadList({ t, downloadLinks, onProcessAgain, onChoos
                       <span className="text-2xl font-bold text-ink-muted">📄</span>
                     </div>
                     <p className="text-ink-muted">
-                      Preview not available
+                      {t('previewNotAvailable')}
                     </p>
                   </div>
                 </div>

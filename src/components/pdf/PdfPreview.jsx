@@ -75,7 +75,7 @@ export default function PdfPreview({ url, t }) {
       } catch (err) {
         console.error('Error loading PDF:', err);
         if (mountedRef.current) {
-          setError('Failed to load PDF');
+          setError(t ? t('pdfLoadFailed') : 'Failed to load PDF');
           setLoading(false);
         }
       }
@@ -98,7 +98,7 @@ export default function PdfPreview({ url, t }) {
       } catch (err) {
         console.error('Error rendering PDF page:', err);
         if (mountedRef.current) {
-          setError('Failed to render PDF page');
+          setError(t ? t('pdfRenderFailed') : 'Failed to render PDF page');
           setLoading(false);
         }
       }
@@ -125,7 +125,7 @@ export default function PdfPreview({ url, t }) {
         <div className="w-16 h-16 mx-auto mb-4 bg-surface-alt rounded-full flex items-center justify-center">
           <span className="text-2xl font-bold text-ink-faint">PDF</span>
         </div>
-        <p className="text-ink-muted">No PDF available for preview</p>
+        <p className="text-ink-muted">{t ? t('noPdfPreview') : 'No PDF available for preview'}</p>
       </div>
     );
   }
@@ -136,7 +136,7 @@ export default function PdfPreview({ url, t }) {
         <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-2 border-line border-t-brand"></div>
         </div>
-        <p className="text-ink-muted">Loading PDF...</p>
+        <p className="text-ink-muted">{t ? t('loadingPdf') : 'Loading PDF...'}</p>
       </div>
     );
   }
@@ -165,7 +165,7 @@ export default function PdfPreview({ url, t }) {
       </div>
       {loading && (
         <div className="text-center py-2">
-          <span className="text-sm text-ink-muted">Rendering...</span>
+          <span className="text-sm text-ink-muted">{t ? t('rendering') : 'Rendering...'}</span>
         </div>
       )}
     </div>
