@@ -11,6 +11,7 @@ export default function PageGrid({
   doc,
   selection,
   onToggle,
+  onOpenPreview,
   onRotateOne,
   onToggleDeleted,
   onMove,
@@ -64,7 +65,7 @@ export default function PageGrid({
               onDragOver={(e) => { if (dragIndex !== null) e.preventDefault(); }}
               onDrop={handleDrop(index)}
               onDragEnd={handleDragEnd}
-              onClick={() => (page.deleted ? onToggleDeleted(page.id) : onToggle(page.id))}
+              onClick={() => onOpenPreview(page.id)}
               className={`group relative flex flex-col gap-1.5 p-2 rounded-btn border cursor-pointer transition-all duration-150 ${
                 page.deleted
                   ? 'border-danger/50 opacity-45'
@@ -72,8 +73,23 @@ export default function PageGrid({
                     ? 'border-brand bg-brand-soft ring-2 ring-brand'
                     : 'border-line bg-surface-alt hover:border-line-strong'
               } ${isDragging ? 'opacity-40' : ''} ${isOver ? 'ring-2 ring-brand' : ''}`}
-              title={page.deleted ? t('deletedPageUndo') : `${t('page')} ${page.page || ''}`}
+              title={`${t('page')} ${index + 1}${page.deleted ? ` (${t('deletedPageUndo')})` : ''}`}
             >
+              {/* Selection dot: invisible until hover; compact brand dot when selected */}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onToggle(page.id); }}
+                className={`absolute top-1 left-1 z-10 w-4 h-4 rounded-full border flex items-center justify-center text-[9px] font-bold leading-none transition-all duration-150 ${
+                  selected
+                    ? 'bg-brand border-brand text-brand-ink opacity-100'
+                    : 'bg-black/35 border-white/80 text-transparent opacity-0 group-hover:opacity-100'
+                }`}
+                title={selected ? t('deselectPage') : t('selectPage')}
+                aria-label={selected ? t('deselectPage') : t('selectPage')}
+                aria-pressed={selected}
+              >
+                ✓
+              </button>
               <PageThumb doc={doc} pageNumber={page.page} extraRotation={page.rotation} />
 
               <div className="flex items-center justify-between px-0.5">

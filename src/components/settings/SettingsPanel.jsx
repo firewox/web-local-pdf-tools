@@ -47,7 +47,8 @@ export default function SettingsPanel({
   PDF_SETTINGS,
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
-  const isGsTab = activeTab === 'compress' || activeTab === 'merge' || activeTab === 'split';
+  // Custom Ghostscript commands only apply to the remaining WASM-backed tools
+  const isGsTab = activeTab === 'compress' || activeTab === 'split';
   // Auto-expand the fold while any folded option is active so state stays visible
   const advancedOpen = moreOpen || useCustomCommand || useAdvancedSettings || showTerminalOutput || showProgressBar || repairMode;
   const activeQuality = PDF_SETTINGS[pdfSetting];
@@ -55,7 +56,7 @@ export default function SettingsPanel({
   return (
     <div className="card space-y-5">
       {/* Primary task settings */}
-      {(activeTab === 'compress' || activeTab === 'merge') && (
+      {activeTab === 'compress' && (
         <div className={useCustomCommand ? 'opacity-50 pointer-events-none' : ''}>
           <label className="block text-xs font-semibold uppercase tracking-wider text-ink-faint mb-2">
             {t('pdfQualitySetting')}

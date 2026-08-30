@@ -25,6 +25,7 @@ export function useOrganize({ activeTab, files, setState, setDownloadLinks, setE
   const [doc, setDoc] = useState(null);
   const [status, setStatus] = useState('idle'); // idle | loading | ready
   const [applying, setApplying] = useState(false);
+  const [previewId, setPreviewId] = useState(null);
 
   // Load the pdfjs document for the organize tab; clear when leaving or empty
   useEffect(() => {
@@ -139,6 +140,17 @@ export function useOrganize({ activeTab, files, setState, setDownloadLinks, setE
     setPages((prev) => reorderFiles(prev, from, to));
   }, []);
 
+  // Large-preview navigation (wraps around)
+  const openPreview = useCallback((id) => setPreviewId(id), []);
+  const closePreview = useCallback(() => setPreviewId(null), []);
+  const stepPreview = useCallback((delta) => {
+    setPreviewId((prev) => {
+      const index = pages.findIndex((p) => p.id === prev);
+      if (index === -1 || pages.length === 0) return prev;
+      return pages[(index + delta + pages.length) % pages.length].id;
+    });
+  }, [pages]);
+
   const resetChanges = useCallback(() => {
     setPages((prev) => prev
       .filter((p) => !p.blank)
@@ -215,11 +227,12 @@ export function useOrganize({ activeTab, files, setState, setDownloadLinks, setE
   }, [pages, selection, files, applying, buildOutput, baseName, finishWith, setState, setErrorMessage]);
 
   return {
-    pages, selection, doc, status, applying,
+    pages, selection, doc, status, applying, previewId,
     keptCount, deleteCount, selectedCount,
     toggleSelect, selectAll, invertSelection,
     rotateSelected, rotateOne, toggleDeleted, deleteSelected,
     insertBlankAfter, movePage, resetChanges,
+    openPreview, closePreview, stepPreview,
     apply, extractSelected,
   };
 }

@@ -47,6 +47,7 @@ export const usePdfOperations = ({
   repairMode,
   setRepairMode,
   organizeApply,
+  mergeApply,
   showTerminalOutput,
   showProgressBar,
   setState,
@@ -501,12 +502,14 @@ export const usePdfOperations = ({
 
     switch (activeTab) {
       case 'compress':
-      case 'merge':
       case 'split':
         await processPDF(activeTab, files, baseFilename);
         break;
       case 'organize':
         if (organizeApply) await organizeApply();
+        break;
+      case 'merge':
+        if (mergeApply) await mergeApply();
         break;
       case 'convert':
         await convertFile(files, baseFilename);
@@ -517,7 +520,7 @@ export const usePdfOperations = ({
       default:
         break;
     }
-  }, [activeTab, files, validateBeforeProcess, processPDF, convertFile, parsePDF, organizeApply]);
+  }, [activeTab, files, validateBeforeProcess, processPDF, convertFile, parsePDF, organizeApply, mergeApply]);
 
   const onSubmit = useCallback(async (event) => {
     event?.preventDefault?.();

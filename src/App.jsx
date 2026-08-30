@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import * as pdfjsLib from 'pdfjs-dist';
 import { useTranslation } from 'react-i18next';
 import { isPdfFile, isImageFile, formatBytes } from './utils/pdf.js';
@@ -10,6 +10,7 @@ import { usePdfParse } from './hooks/usePdfParse';
 import { useFileHandling } from './hooks/useFileHandling';
 import { usePdfOperations } from './hooks/usePdfOperations';
 import { useOrganize } from './hooks/useOrganize';
+import { useMerge, SOURCE_COLORS } from './hooks/useMerge';
 
 // Components
 import LoadingPanel from './components/state/LoadingPanel.jsx';
@@ -27,6 +28,9 @@ import PageSubtitle from './components/common/PageSubtitle.jsx';
 import ActionSubmit from './components/common/ActionSubmit.jsx';
 import PageGrid from './components/organize/PageGrid.jsx';
 import OrganizePanel from './components/organize/OrganizePanel.jsx';
+import PagePreviewModal from './components/organize/PagePreviewModal.jsx';
+import MergePageGrid from './components/merge/MergePageGrid.jsx';
+import MergePanel from './components/merge/MergePanel.jsx';
 
 
 
@@ -84,14 +88,11 @@ function App() {
     setPdfPageCount,
   } = useSettings();
 
-  // Quality presets; merge offers an extra "keep original quality" option and
-  // defaults to it so combining files never silently re-compresses them.
-  // Keys are the values passed to Ghostscript (-dPDFSETTINGS); each entry has a
-  // short label for the segmented control and a longer description line.
+  // Quality presets. Keys are the values passed to Ghostscript
+  // (-dPDFSETTINGS); each entry has a short label for the segmented control
+  // and a longer description line. Merge is lossless via pdf-lib and no
+  // longer offers re-compression.
   const PDF_SETTINGS = {
-    ...(activeTab === 'merge'
-      ? { original: { short: t('qualityOriginalShort'), desc: t('originalQuality') } }
-      : null),
     '/screen': { short: t('qualityScreenShort'), desc: t('screenOptimized') },
     '/ebook': { short: t('qualityEbookShort'), desc: t('ebook') },
     '/printer': { short: t('qualityPrinterShort'), desc: t('printer') },
@@ -99,10 +100,9 @@ function App() {
     '/default': { short: t('qualityDefaultShort'), desc: t('default') },
   };
 
-  // Reset the preset when entering a tab: merge keeps original quality,
-  // the other tabs start from the ebook preset.
+  // Start each tab from the ebook preset
   useEffect(() => {
-    setPdfSetting(activeTab === 'merge' ? 'original' : '/ebook');
+    setPdfSetting('/ebook');
   }, [activeTab, setPdfSetting]);
 
   const {
@@ -131,6 +131,21 @@ function App() {
     setNotice,
     t,
   });
+
+  // Same for the page-level merge workbench
+  const merge = useMerge({
+    activeTab,
+    files,
+    setState,
+    setDownloadLinks,
+    setErrorMessage,
+    setNotice,
+    t,
+  });
+
+  // Stable lookups for the shared page preview modal
+  const getOrganizeDoc = useCallback(() => organize.doc, [organize.doc]);
+  const getMergeDoc = useCallback((page) => merge.docs[page.key], [merge.docs]);
 
   const {
     draggingIndex,
@@ -193,6 +208,7 @@ function App() {
     repairMode,
     setRepairMode,
     organizeApply: organize.apply,
+    mergeApply: merge.apply,
     setNotice,
     showTerminalOutput,
     showProgressBar,
@@ -549,6 +565,7 @@ function App() {
                         doc={organize.doc}
                         selection={organize.selection}
                         onToggle={organize.toggleSelect}
+                        onOpenPreview={organize.openPreview}
                         onRotateOne={organize.rotateOne}
                         onToggleDeleted={organize.toggleDeleted}
                         onMove={organize.movePage}
@@ -559,6 +576,98 @@ function App() {
                 )}
               </div>
               <OrganizePanel t={t} editor={organize} fileMissing={files.length === 0} />
+              {organize.previewId && (
+                <PagePreviewModal
+                  t={t}
+                  getDoc={getOrganizeDoc}
+                  pages={organize.pages}
+                  previewId={organize.previewId}
+                  selection={organize.selection}
+                  onClose={organize.closePreview}
+                  onNav={organize.stepPreview}
+                  onToggleSelect={organize.toggleSelect}
+                  onRotateOne={organize.rotateOne}
+                  onToggleDeleted={organize.toggleDeleted}
+                  onInsertBlankAfter={organize.insertBlankAfter}
+                />
+              )}
+            </div>
+          ) : activeTab === 'merge' && state !== 'loading' ? (
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">
+              <div className="min-w-0 space-y-4">
+                {files.length === 0 ? fileSelector : (
+                  <>
+                    <div className="card px-4 py-3 space-y-3">
+                      <div className="flex flex-wrap gap-2">
+                        {merge.sources.map((s) => {
+                          const color = SOURCE_COLORS[s.colorIndex % SOURCE_COLORS.length];
+                          const fileIndex = files.findIndex((f) => `${f.filename}::${f.lastModified}` === s.key);
+                          return (
+                            <span
+                              key={s.key}
+                              className="inline-flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full border text-xs font-medium text-ink"
+                              style={{ borderColor: color.chip, background: `${color.chip}1f` }}
+                            >
+                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color.chip }} aria-hidden="true" />
+                              <span className="max-w-[10rem] truncate">{s.name}</span>
+                              <span className="text-ink-faint">· {s.numPages}p</span>
+                              <button
+                                type="button"
+                                className="text-ink-faint hover:text-danger leading-none"
+                                title={t('removeFile')}
+                                aria-label={t('removeFile')}
+                                onClick={() => { if (fileIndex >= 0) removeFile(fileIndex); }}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="button" className="btn-secondary text-sm px-3 py-1.5" onClick={addMoreFiles}>
+                          {t('addMoreFiles')}
+                        </button>
+                        <button type="button" className="btn-danger text-sm px-3 py-1.5" onClick={clearAllFiles}>
+                          {t('clearAll')}
+                        </button>
+                      </div>
+                    </div>
+                    {merge.status === 'loading' ? (
+                      <div className="card text-center py-12">
+                        <div className="animate-spin rounded-full h-10 w-10 border-2 border-line border-t-brand mx-auto mb-3" role="status" />
+                        <p className="text-sm text-ink-muted">{t('loadingPdf')}</p>
+                      </div>
+                    ) : merge.status === 'ready' && (
+                      <MergePageGrid
+                        t={t}
+                        pages={merge.pages}
+                        docs={merge.docs}
+                        sources={merge.sources}
+                        onOpenPreview={merge.openPreview}
+                        onRotateOne={merge.rotateOne}
+                        onMove={merge.movePage}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+              <MergePanel t={t} editor={merge} fileMissing={files.length < 2} />
+              {merge.previewId && (
+                <PagePreviewModal
+                  t={t}
+                  getDoc={getMergeDoc}
+                  pages={merge.pages}
+                  previewId={merge.previewId}
+                  onClose={merge.closePreview}
+                  onNav={merge.stepPreview}
+                  onRotateOne={merge.rotateOne}
+                  getSourceLabel={(page) => {
+                    const s = merge.sources.find((src) => src.key === page.key);
+                    return s ? t('sourcePageLabel', { name: s.name, page: page.page }) : null;
+                  }}
+                />
+              )}
             </div>
           ) : state === "loading" ? (
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">

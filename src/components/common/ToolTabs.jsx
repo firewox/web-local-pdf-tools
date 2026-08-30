@@ -11,6 +11,8 @@ export default function ToolTabs({ t, activeTab, setActiveTab, resetForm }) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const tag = e.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      // Let modals (e.g. page preview) own the keyboard
+      if (document.body.dataset.previewOpen === '1') return;
       const keyNum = parseInt(e.key, 10);
       if (!Number.isInteger(keyNum) || keyNum < 1 || keyNum > TOOL_ORDER.length) return;
       const tab = TOOL_ORDER[keyNum - 1];

@@ -34,7 +34,8 @@ export default function PageThumb({ doc, pageNumber, extraRotation = 0 }) {
         if (cancelled) return;
         const base = page.getViewport({ scale: 1 });
         const rotation = (((page.rotate || 0) + extraRotation) % 360 + 360) % 360;
-        const viewport = page.getViewport({ scale: 140 / base.width, rotation });
+        // Render at 2x the cell width so the thumbnail stays crisp on hi-dpi
+        const viewport = page.getViewport({ scale: (280 / base.width), rotation });
         const canvas = canvasRef.current;
         if (!canvas) return;
         canvas.width = Math.max(1, Math.floor(viewport.width));
