@@ -78,12 +78,19 @@ This document defines the AI agents and their roles within the **web-local-pdf-t
 - 支持逐页预览和导航
 - 支持复制单页或全部文本，导出为 TXT 文件
 
-### 5. PDF/图片 转换（Convert）
+### 5. 页面工作台（Organize）
+- 可视化页面网格：点选多页、拖拽排序、悬停单页旋转/插页
+- 批量操作：全选/反选、旋转 90°、删除（幻影格可点击恢复）、插入空白页（A4）
+- 「提取选中页」直接导出新 PDF；「应用更改」按当前状态无损重建（pdf-lib `copyPages` + `setRotation`，不经 Ghostscript 重编码）
+- 所有编辑为前端状态，可随时「重置更改」；缩略图懒渲染（IntersectionObserver，大 PDF 不卡）
+- **修复模式**：压缩 tab 高级选项中的复选框，跳过质量预设用 pdfwrite 重写文件结构，抢救损坏 PDF
+
+### 6. PDF/图片 转换（Convert）
 - **PDF → 图片**：将 PDF 按页渲染为 JPG / JPEG / PNG / BMP（Canvas 2 倍分辨率渲染），支持页码范围选择（如 `1,3-5`），逐页生成下载项并带预览
 - **图片 → PDF**：将多张图片（JPG/PNG/BMP）合成为 PDF（jsPDF，A4 纸张），按首张图片方向自动横/竖版，图片居中缩放，支持拖拽排序
 
-### 6. 通用功能
-- **多 UI 主题**：5 套可切换设计风格 —— Bento Grid（默认）、Aurora Glass、Swiss Type、Neo-Brutalism、Terminal
+### 7. 通用功能
+- **多 UI 主题**：6 套工具卡（含整理页面）+ 5 套可切换设计风格 —— Bento Grid（默认）、Aurora Glass、Swiss Type、Neo-Brutalism、Terminal
 - **暗黑模式**：亮色/暗色主题切换，首次访问自动识别系统偏好
 - **多语言支持**：英文、简体中文（localStorage 持久化）
 - **拖放上传**：文件选择区支持拖放文件

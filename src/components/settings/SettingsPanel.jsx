@@ -34,6 +34,8 @@ export default function SettingsPanel({
   setShowProgressBar,
   useAdvancedSettings,
   setUseAdvancedSettings,
+  repairMode,
+  setRepairMode,
   advancedSettings,
   setAdvancedSettings,
   convertFormat,
@@ -47,7 +49,7 @@ export default function SettingsPanel({
   const [moreOpen, setMoreOpen] = useState(false);
   const isGsTab = activeTab === 'compress' || activeTab === 'merge' || activeTab === 'split';
   // Auto-expand the fold while any folded option is active so state stays visible
-  const advancedOpen = moreOpen || useCustomCommand || useAdvancedSettings || showTerminalOutput || showProgressBar;
+  const advancedOpen = moreOpen || useCustomCommand || useAdvancedSettings || showTerminalOutput || showProgressBar || repairMode;
   const activeQuality = PDF_SETTINGS[pdfSetting];
 
   return (
@@ -192,6 +194,15 @@ export default function SettingsPanel({
               onChange={setUseAdvancedSettings}
               label={t('useAdvancedSettings')}
             />
+
+            {activeTab === 'compress' && (
+              <CheckRow
+                id="repairMode"
+                checked={repairMode}
+                onChange={setRepairMode}
+                label={t('repairMode')}
+              />
+            )}
 
             {useAdvancedSettings && isGsTab && (
               <div className="pl-7 space-y-3">

@@ -44,6 +44,9 @@ export const usePdfOperations = ({
   selectedPages,
   setSelectedPages,
   pdfPageCount,
+  repairMode,
+  setRepairMode,
+  organizeApply,
   showTerminalOutput,
   showProgressBar,
   setState,
@@ -99,8 +102,9 @@ export const usePdfOperations = ({
     try {
       let dataObject = {
         operation,
-        // 'original' (merge) means no -dPDFSETTINGS: combine files without re-compressing
-        pdfSetting: (useCustomCommand || pdfSetting === 'original') ? null : pdfSetting,
+        // 'original' (merge) means no -dPDFSETTINGS: combine files without re-compressing.
+        // Repair mode also skips presets: pdfwrite rewrites the file structure only.
+        pdfSetting: (useCustomCommand || pdfSetting === 'original' || repairMode) ? null : pdfSetting,
         customCommand: useCustomCommand ? customCommand : null,
         advancedSettings: useAdvancedSettings ? advancedSettings : null,
         showTerminalOutput: showTerminalOutput,
@@ -396,6 +400,7 @@ export const usePdfOperations = ({
     setSupportedFormats?.([]);
     setUseAdvancedSettings?.(false);
     setUseCustomCommand?.(false);
+    setRepairMode?.(false);
     setCustomCommand?.('');
   }, [
     files,
@@ -413,6 +418,7 @@ export const usePdfOperations = ({
     setSupportedFormats,
     setUseAdvancedSettings,
     setUseCustomCommand,
+    setRepairMode,
     setCustomCommand,
   ]);
 
@@ -499,6 +505,9 @@ export const usePdfOperations = ({
       case 'split':
         await processPDF(activeTab, files, baseFilename);
         break;
+      case 'organize':
+        if (organizeApply) await organizeApply();
+        break;
       case 'convert':
         await convertFile(files, baseFilename);
         break;
@@ -508,7 +517,7 @@ export const usePdfOperations = ({
       default:
         break;
     }
-  }, [activeTab, files, validateBeforeProcess, processPDF, convertFile, parsePDF]);
+  }, [activeTab, files, validateBeforeProcess, processPDF, convertFile, parsePDF, organizeApply]);
 
   const onSubmit = useCallback(async (event) => {
     event?.preventDefault?.();

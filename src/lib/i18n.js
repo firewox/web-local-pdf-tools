@@ -12,6 +12,7 @@ const resources = {
       "compress": "Compress",
       "merge": "Merge", 
       "split": "Split",
+      "organize": "Organize",
       "parse": "Parse",
       "convert": "Convert",
       
@@ -19,8 +20,27 @@ const resources = {
       "compressDesc": "Reduce PDF file size while maintaining quality.",
       "mergeDesc": "Combine multiple PDF files into a single document.",
       "splitDesc": "Extract specific page ranges from a PDF document.",
+      "organizeDesc": "Rotate, delete, reorder and extract pages visually.",
       "parseDesc": "Extract text from PDF pages for copy or export.",
       "convertDesc": "Convert PDF files to images or images to PDF.",
+
+      // Organize tool
+      "organizeApply": "Apply changes",
+      "organizeExtract": "Extract selected pages",
+      "organizeRotate": "Rotate 90°",
+      "organizeDelete": "Delete selected",
+      "organizeInsertBlank": "Insert blank page",
+      "organizeReset": "Reset changes",
+      "selectAll": "Select all",
+      "invertSelection": "Invert",
+      "selectedPagesCount": "{{selected}} / {{total}} pages selected",
+      "deletedPagesCount": "{{count}} page(s) will be deleted",
+      "keepAtLeastOnePage": "Keep at least one page",
+      "blankPage": "Blank",
+      "deletedPageUndo": "Deleted - click to restore",
+      "organizeGridHint": "Click to select · drag to reorder · hover a page for actions",
+      "changeFile": "Change file",
+      "repairMode": "Repair mode (rewrite file structure, no compression)",
       
       // File input
       "chooseFiles": "Choose PDF file{{count}} to {{operation}}",
@@ -181,6 +201,7 @@ const resources = {
       "compress": "压缩",
       "merge": "合并",
       "split": "拆分",
+      "organize": "整理页面",
       "parse": "解析",
       "convert": "文件转换",
       
@@ -188,8 +209,27 @@ const resources = {
       "compressDesc": "在保持质量的同时减小 PDF 文件大小。",
       "mergeDesc": "将多个 PDF 文件合并为单个文档。",
       "splitDesc": "从 PDF 文档中提取特定页面范围。",
+      "organizeDesc": "可视化旋转、删除、重排和提取 PDF 页面。",
       "parseDesc": "提取 PDF 各页的文本，支持复制与导出。",
       "convertDesc": "将 PDF 文件转换为图片或将图片转换为 PDF。",
+
+      // Organize tool
+      "organizeApply": "应用更改",
+      "organizeExtract": "提取选中页",
+      "organizeRotate": "旋转 90°",
+      "organizeDelete": "删除选中",
+      "organizeInsertBlank": "插入空白页",
+      "organizeReset": "重置更改",
+      "selectAll": "全选",
+      "invertSelection": "反选",
+      "selectedPagesCount": "已选 {{selected}} / {{total}} 页",
+      "deletedPagesCount": "{{count}} 页将被删除",
+      "keepAtLeastOnePage": "至少保留一页",
+      "blankPage": "空白",
+      "deletedPageUndo": "已删除 - 点击恢复",
+      "organizeGridHint": "点击选中 · 拖拽排序 · 悬停页面可旋转/插页",
+      "changeFile": "更换文件",
+      "repairMode": "修复模式（重写文件结构，不压缩）",
       
       // File input
       "chooseFiles": "选择要{{operation}}的 PDF 文件{{count}}",

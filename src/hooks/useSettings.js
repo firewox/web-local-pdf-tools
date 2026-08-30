@@ -17,6 +17,7 @@ export const useSettings = () => {
     },
   });
   const [useAdvancedSettings, setUseAdvancedSettings] = useState(false);
+  const [repairMode, setRepairMode] = useState(false);
   const [convertFormat, setConvertFormat] = useState('');
   const [supportedFormats, setSupportedFormats] = useState([]);
   const [selectedPages, setSelectedPages] = useState('');
@@ -35,6 +36,8 @@ export const useSettings = () => {
     setAdvancedSettings,
     useAdvancedSettings,
     setUseAdvancedSettings,
+    repairMode,
+    setRepairMode,
     convertFormat,
     setConvertFormat,
     supportedFormats,

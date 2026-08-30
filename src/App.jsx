@@ -1,7 +1,7 @@
 import { useRef, useEffect, useState } from "react";
 import * as pdfjsLib from 'pdfjs-dist';
 import { useTranslation } from 'react-i18next';
-import { isPdfFile, isImageFile } from './utils/pdf.js';
+import { isPdfFile, isImageFile, formatBytes } from './utils/pdf.js';
 
 // Custom Hooks
 import { useAppState } from './hooks/useAppState';
@@ -9,6 +9,7 @@ import { useSettings } from './hooks/useSettings';
 import { usePdfParse } from './hooks/usePdfParse';
 import { useFileHandling } from './hooks/useFileHandling';
 import { usePdfOperations } from './hooks/usePdfOperations';
+import { useOrganize } from './hooks/useOrganize';
 
 // Components
 import LoadingPanel from './components/state/LoadingPanel.jsx';
@@ -24,6 +25,8 @@ import PdfParsePreview from './components/parse/PdfParsePreview.jsx';
 import ParsedTextPanel from './components/parse/ParsedTextPanel.jsx';
 import PageSubtitle from './components/common/PageSubtitle.jsx';
 import ActionSubmit from './components/common/ActionSubmit.jsx';
+import PageGrid from './components/organize/PageGrid.jsx';
+import OrganizePanel from './components/organize/OrganizePanel.jsx';
 
 
 
@@ -69,6 +72,8 @@ function App() {
     setAdvancedSettings,
     useAdvancedSettings,
     setUseAdvancedSettings,
+    repairMode,
+    setRepairMode,
     convertFormat,
     setConvertFormat,
     supportedFormats,
@@ -115,6 +120,17 @@ function App() {
     highlightMap,
     setHighlightMap,
   } = usePdfParse();
+
+  // Must run before usePdfOperations: its apply callback is passed into it
+  const organize = useOrganize({
+    activeTab,
+    files,
+    setState,
+    setDownloadLinks,
+    setErrorMessage,
+    setNotice,
+    t,
+  });
 
   const {
     draggingIndex,
@@ -174,6 +190,9 @@ function App() {
     setCurrentParsedPage,
     setPdfPageCount,
     pdfPageCount,
+    repairMode,
+    setRepairMode,
+    organizeApply: organize.apply,
     setNotice,
     showTerminalOutput,
     showProgressBar,
@@ -485,9 +504,63 @@ function App() {
 
         {/* Workspace: files left, actions right; stacks on small screens.
             While loading the progress card takes over the action column so
-            the file context stays on screen. */}
+            the file context stays on screen. The organize tool gets its own
+            page-grid workspace. */}
         {(state === "init" || state === "selected" || state === "loading") && (
-          state === "loading" ? (
+          activeTab === 'organize' && state !== 'loading' ? (
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">
+              <div className="min-w-0 space-y-4">
+                {files.length === 0 ? fileSelector : (
+                  <>
+                    <div className="card flex items-center justify-between gap-3 px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-ink truncate">{files[0].filename}</p>
+                        <p className="text-xs text-ink-faint">
+                          {formatBytes(files[0].size)}
+                          {files[0].pages ? ` · ${t('pages', { count: files[0].pages })}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          type="button"
+                          className="btn-secondary text-sm px-3 py-1.5"
+                          onClick={() => { clearAllFiles(); setTimeout(() => document.getElementById('files')?.click(), 100); }}
+                        >
+                          {t('changeFile')}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-danger text-sm px-3 py-1.5"
+                          onClick={clearAllFiles}
+                        >
+                          {t('clearAll')}
+                        </button>
+                      </div>
+                    </div>
+                    {organize.status === 'loading' ? (
+                      <div className="card text-center py-12">
+                        <div className="animate-spin rounded-full h-10 w-10 border-2 border-line border-t-brand mx-auto mb-3" role="status" />
+                        <p className="text-sm text-ink-muted">{t('loadingPdf')}</p>
+                      </div>
+                    ) : organize.status === 'ready' && (
+                      <PageGrid
+                        t={t}
+                        pages={organize.pages}
+                        doc={organize.doc}
+                        selection={organize.selection}
+                        onToggle={organize.toggleSelect}
+                        onRotateOne={organize.rotateOne}
+                        onToggleDeleted={organize.toggleDeleted}
+                        onMove={organize.movePage}
+                        onInsertBlankAfter={organize.insertBlankAfter}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+              <OrganizePanel t={t} editor={organize} fileMissing={files.length === 0} />
+            </div>
+          ) : state === "loading" ? (
             <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">
               <div className="min-w-0">
                 {fileSelector}
@@ -536,6 +609,8 @@ function App() {
                   setShowProgressBar={setShowProgressBar}
                   useAdvancedSettings={useAdvancedSettings}
                   setUseAdvancedSettings={setUseAdvancedSettings}
+                  repairMode={repairMode}
+                  setRepairMode={setRepairMode}
                   advancedSettings={advancedSettings}
                   setAdvancedSettings={setAdvancedSettings}
                   convertFormat={convertFormat}

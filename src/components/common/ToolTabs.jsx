@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { TOOL_ICONS, TOOL_ORDER } from './toolIcons';
 
 /**
- * Tool selector: one large card per tool. Keys 1-5 switch tools
+ * Tool selector: one large card per tool. Keys 1-N switch tools
  * (ignored while typing in inputs).
  */
 export default function ToolTabs({ t, activeTab, setActiveTab, resetForm }) {
@@ -11,9 +11,9 @@ export default function ToolTabs({ t, activeTab, setActiveTab, resetForm }) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const tag = e.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-      const index = ['1', '2', '3', '4', '5'].indexOf(e.key);
-      if (index === -1) return;
-      const tab = TOOL_ORDER[index];
+      const keyNum = parseInt(e.key, 10);
+      if (!Number.isInteger(keyNum) || keyNum < 1 || keyNum > TOOL_ORDER.length) return;
+      const tab = TOOL_ORDER[keyNum - 1];
       if (tab && tab !== activeTab) {
         setActiveTab(tab);
         resetForm();
@@ -24,7 +24,7 @@ export default function ToolTabs({ t, activeTab, setActiveTab, resetForm }) {
   }, [activeTab, setActiveTab, resetForm]);
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3" role="tablist" aria-label={t('title')}>
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3" role="tablist" aria-label={t('title')}>
       {TOOL_ORDER.map((id, index) => {
         const active = activeTab === id;
         return (
